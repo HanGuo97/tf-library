@@ -31,6 +31,15 @@ def check_equality(A, B, tolerance=1e-7):
     print("SSE: %.11f %r" % (diff, diff < tolerance))
 
 
+def check_inequality(A, B, tolerance=1e-3):
+    if isinstance(A, (list, tuple, np.ndarray)):
+        diff = L2_distance(A, B)
+    else:
+        diff = np.square(A - B)
+    print("SSE: %.11f %r" % (diff, diff > tolerance))
+
+
+
 def L2_distance(X, Y):
     # MSE = doubled_l2 / batch_size
     # L2 = doubled_l2 / 2

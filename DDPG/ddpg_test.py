@@ -51,10 +51,10 @@ def ddpg_test():
         global_variables[var.name] = var
 
 
-    test_actor_gradients(actor, critic, sess, global_variables)
+    test_actor(actor, critic, sess, global_variables)
 
 
-def test_actor_gradients(actor, critic, sess, global_variables):
+def test_actor(actor, critic, sess, global_variables):
     """Test Actor Gradients
         
         U: Actor
@@ -63,9 +63,12 @@ def test_actor_gradients(actor, critic, sess, global_variables):
         grad(theta) J ~= grad(a) Q(s=s,a=U(s)) x grad(theta) U(s)
 
     """
+    # Test The Objective Gradient
+    # ============================================
     print("TESTING: test_actor_gradients\n\n")
 
-    # Set Up ========================================
+    # Set Up
+    # --------------------------------------------------
     state = test_utils.random_vector([32, 128])
     variables = sess.run(global_variables)
     # it's too complicated to replicate the BatchNorm
@@ -76,7 +79,7 @@ def test_actor_gradients(actor, critic, sess, global_variables):
         "Critic/normalized_inputs:0", {"Critic/inputs:0": state})
 
     # Actual Gradients
-    # =================================================
+    # --------------------------------------------------
     # U(s)
     actual_action = actor.predict(inputs=state)
     # Q(s,a=U(s))
@@ -87,10 +90,8 @@ def test_actor_gradients(actor, critic, sess, global_variables):
     actual_actor_grads = actor.actor_gradients(
         inputs=state, gradiens=actual_critic_grads[0])
 
-
-
     # Expected Gradients
-    # =================================================
+    # --------------------------------------------------
     # grad(W, b) U
     grad_actor_wrt_params = autograd.elementwise_grad(actor_fn, argnum=[1, 2])
     # grad(A) Q
@@ -145,17 +146,46 @@ def test_actor_gradients(actor, critic, sess, global_variables):
     test_utils.check_equality(actual_actor_grads[0], expected_grad_J_wrt_W)
     test_utils.check_equality(actual_actor_grads[1], expected_grad_J_wrt_b)
 
-    # Actual Gradients
-    # =================================================
-    # U(s)
-    actual_action = actor.predict(inputs=state)
-    # Q(s,a=U(s))
-    actual_Q = critic.predict(inputs=state, actions=actual_action)
-    # symbolic grad(a) Q, and grad U
-    actual_critic_grads = critic.action_gradients(
-        inputs=state, actions=actual_action)
-    actual_actor_grads = actor.actor_gradients(
-        inputs=state, gradiens=actual_critic_grads[0])
+    
+
+    # Test Updating The Model
+    # ============================================
+    print("\n\n\nTESTING: updating the model\n\n")
+    # old parameters
+    old_actor_params = sess.run(actor._actor_params)
+    old_actor_target_params = sess.run(actor._target_params)
+    # update model
+    actor.train(
+        inputs=state,
+        action_gradients=actual_critic_grads[0])
+    # new parameters
+    new_actor_params = sess.run(actor._actor_params)
+    new_actor_target_params = sess.run(actor._target_params)
+
+
+    # actors should be ** different **
+    [test_utils.check_inequality(n, o)
+        for n, o in zip(old_actor_params,
+                        new_actor_params)]
+    
+    # targets should be same
+    [test_utils.check_equality(n, o)
+        for n, o in zip(old_actor_target_params,
+                        new_actor_target_params)]
+
+    # manually compute updates
+    lr = actor._learning_rate
+    actor_params_diff = [n - o
+        for n, o in zip(new_actor_params, old_actor_params)]
+    
+    # negative gradients as in gradient descent
+    scaled_gradients = [lr * - grad
+        for grad in actual_actor_grads]
+
+    [test_utils.check_equality(a, g)
+        for a, g in zip(actor_params_diff, scaled_gradients)]
+
+
 
 
 def actor_fn(S, W, b):
