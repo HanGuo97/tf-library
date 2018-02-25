@@ -197,6 +197,7 @@ class ActorNetwork(object):
                  learning_rate,
                  tau,
                  activation=math_ops.tanh,
+                 batch_norm=True,
                  opitmizer_name="adam",
                  actor_scope=None,
                  target_scope=None):
@@ -207,6 +208,7 @@ class ActorNetwork(object):
         self._learning_rate = learning_rate
         self._tau = tau
         self._activation = activation
+        self._batch_norm = batch_norm
         self._actor_scope = actor_scope
         self._target_scope = target_scope
 
@@ -217,12 +219,14 @@ class ActorNetwork(object):
         # Actor Network
         (actor_inputs,
          actor_outputs,
-         actor_params) = self._build_network(actor_scope)
+         actor_params,
+         actor_normalized_inputs) = self._build_network(actor_scope)
 
         # Target Network
         (target_inputs,
          target_outputs,
-         target_params) = self._build_network(target_scope)
+         target_params,
+         target_normalized_inputs) = self._build_network(target_scope)
 
         num_trainable_vars = len(actor_params) + len(target_params)
 
@@ -261,10 +265,12 @@ class ActorNetwork(object):
         self._actor_params = actor_params
         self._actor_inputs = actor_inputs
         self._actor_outputs = actor_outputs
+        self._actor_normalized_inputs = actor_normalized_inputs
         
         self._target_params = target_params
         self._target_inputs = target_inputs
         self._target_outputs = target_outputs
+        self._target_normalized_inputs = target_normalized_inputs
         
         self._action_gradients = action_gradients
         self._actor_gradients = actor_gradients
@@ -286,26 +292,30 @@ class ActorNetwork(object):
                 name="network_bias",
                 shape=[self._num_actions])
 
-            normalized_inputs = contrib_layers.batch_norm(
-                inputs=inputs,
-                is_training=True,
-                # force the updates in place
-                # but have a speed penalty
-                updates_collections=None)
+            if self._batch_norm:
+                normalized_inputs = contrib_layers.batch_norm(
+                    inputs=inputs,
+                    is_training=True,
+                    # force the updates in place
+                    # but have a speed penalty
+                    updates_collections=None)
+            else:
+                normalized_inputs = inputs
 
-            # for debugging purposes
-            # "Actor/normalized_inputs:0"
-            array_ops.identity(normalized_inputs, "normalized_inputs")
+            # for easier fetching
+            normalized_inputs = array_ops.identity(
+                normalized_inputs, name="normalized_inputs")
 
+            # one layer without linearity
             outputs = math_ops.matmul(normalized_inputs, kernel)
-            outputs = nn_ops.bias_add(outputs, bias)
+            outputs = nn_ops.bias_add(outputs, bias, name="outputs")
             
             if self._activation is not None:
-                outputs = self._activation(outputs)
+                outputs = self._activation(outputs, name="outputs_activated")
 
         parameters = variables.trainable_variables(s.name)
         
-        return inputs, outputs, parameters
+        return inputs, outputs, parameters, normalized_inputs
 
     def train(self, inputs, action_gradients):
         return self._sess.run(
@@ -357,6 +367,7 @@ class CriticNetwork(object):
                  tau,
                  gamma,
                  activation=None,
+                 batch_norm=True,
                  opitmizer_name="adam",
                  critic_scope=None,
                  target_scope=None):
@@ -370,6 +381,7 @@ class CriticNetwork(object):
         self._tau = tau
         self._gamma = gamma
         self._activation = activation
+        self._batch_norm = batch_norm
         self._critic_scope = critic_scope
         self._target_scope = target_scope
 
@@ -377,13 +389,15 @@ class CriticNetwork(object):
         (critic_inputs,
          critic_actions,
          critic_outputs,
-         critic_params) = self._build_network(critic_scope)
+         critic_params,
+         critic_normalized_inputs) = self._build_network(critic_scope)
 
         # Target Network
         (target_inputs,
          target_actions,
          target_outputs,
-         target_params) = self._build_network(target_scope)
+         target_params,
+         target_normalized_inputs) = self._build_network(target_scope)
 
         # Op for periodically updating target network
         # with online network weights
@@ -418,11 +432,13 @@ class CriticNetwork(object):
         self._critic_inputs = critic_inputs
         self._critic_actions = critic_actions
         self._critic_outputs = critic_outputs
+        self._critic_normalized_inputs = critic_normalized_inputs
         
         self._target_params = target_params
         self._target_inputs = target_inputs
         self._target_actions = target_actions
         self._target_outputs = target_outputs
+        self._target_normalized_inputs = target_normalized_inputs
         
         self._TD_target = TD_target
         self._critic_loss = critic_loss
@@ -452,27 +468,31 @@ class CriticNetwork(object):
                 name="network_bias",
                 shape=[1])
 
-            normalized_inputs = contrib_layers.batch_norm(
-                inputs=inputs,
-                is_training=True,
-                # force the updates in place
-                # but have a speed penalty
-                updates_collections=None)
+            if self._batch_norm:
+                normalized_inputs = contrib_layers.batch_norm(
+                    inputs=inputs,
+                    is_training=True,
+                    # force the updates in place
+                    # but have a speed penalty
+                    updates_collections=None)
+            else:
+                normalized_inputs = inputs
 
-            # for debugging purposes
-            # "Actor/normalized_inputs:0"
-            array_ops.identity(normalized_inputs, "normalized_inputs")
+            # for easier fetching
+            normalized_inputs = array_ops.identity(
+                normalized_inputs, name="normalized_inputs")
 
+            # one layer without linearity
             _input = math_ops.matmul(normalized_inputs, inputs_kernel)
             _actions = math_ops.matmul(actions, actions_kernel)
-            outputs = nn_ops.bias_add(_input + _actions, bias)
+            outputs = nn_ops.bias_add(_input + _actions, bias, name="outputs")
 
             if self._activation is not None:
-                outputs = self._activation(outputs)
+                outputs = self._activation(outputs, name="outputs_activated")
 
             parameters = variables.trainable_variables(s.name)
 
-        return inputs, actions, outputs, parameters
+        return inputs, actions, outputs, parameters, normalized_inputs
 
     def train(self, inputs, actions, TD_target):
         return self._sess.run(

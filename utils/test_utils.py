@@ -15,29 +15,28 @@ def random_integers(low, high, shape, dtype=tf.int32):
     return randint
     
     
-def random_tensor(shape):
-    return tf.random_normal(shape=shape)
+def random_tensor(shape, *args, **kargs):
+    return tf.random_normal(shape=shape, *args, **kargs)
 
 
-def random_vector(shape):
-    return np.random.normal(size=shape)
+def random_vector(shape, *args, **kargs):
+    return np.random.normal(size=shape, *args, **kargs)
 
 
-def check_equality(A, B, tolerance=1e-7):
+def check_equality(A, B, descip="", tolerance=1e-7):
     if isinstance(A, (list, tuple, np.ndarray)):
         diff = L2_distance(A, B)
     else:
         diff = np.square(A - B)
-    print("SSE: %.11f %r" % (diff, diff < tolerance))
+    print("SSE: %.11f\t%s: %r" % (diff, descip, diff < tolerance))
 
 
-def check_inequality(A, B, tolerance=1e-3):
+def check_inequality(A, B, descip="", tolerance=1e-3):
     if isinstance(A, (list, tuple, np.ndarray)):
         diff = L2_distance(A, B)
     else:
         diff = np.square(A - B)
-    print("SSE: %.11f %r" % (diff, diff > tolerance))
-
+    print("SSE: %.11f\t%s: %r" % (diff, descip, diff > tolerance))
 
 
 def L2_distance(X, Y):
@@ -46,6 +45,10 @@ def L2_distance(X, Y):
     doubled_l2 = np.sum(np.square(X - Y))
     # follow TF's implementation
     return doubled_l2 / 2
+
+
+def test_message(msg):
+    print("\n\n\nTESTING:\t" + msg + "\n\n\n")
 
 
 ################################################
