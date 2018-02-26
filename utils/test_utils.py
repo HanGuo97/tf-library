@@ -39,10 +39,14 @@ def check_inequality(A, B, descip="", tolerance=1e-3):
     print("SSE: %.11f\t%s: %r" % (diff, descip, diff > tolerance))
 
 
-def L2_distance(X, Y):
+def L2_distance(X, Y, mean=False):
     # MSE = doubled_l2 / batch_size
     # L2 = doubled_l2 / 2
-    doubled_l2 = np.sum(np.square(X - Y))
+    if mean:
+        doubled_l2 = np.mean(np.square(X - Y))
+    else:
+        doubled_l2 = np.sum(np.square(X - Y))
+    
     # follow TF's implementation
     return doubled_l2 / 2
 
@@ -62,7 +66,7 @@ class Point:
 
     def train_loss(self):
         # Sum(Xi - Xi*)^2
-        return L2_distance(self.params, self.params_train)
+        return L2_distance(self.params, self.params_train, mean=True)
     
     def regularization_loss(self, P2, coefs):
         # alpha x Sum(Xi - Zi)^2
@@ -79,7 +83,7 @@ class Point:
 
     def validation_loss(self):
         # Sum(Xi - Xi*)^2
-        return L2_distance(self.params, self.params_val)
+        return L2_distance(self.params, self.params_val, mean=True)
 
     def gradient(self, P2, coefs):
         # grad = 2(X - X*) + 2 alpha x (X - _X)

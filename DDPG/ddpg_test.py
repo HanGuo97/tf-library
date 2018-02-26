@@ -22,6 +22,7 @@ def ddpg_test():
         # using SGD for easier debugging
         batch_norm=True,
         opitmizer_name="sgd",
+        max_gradient_norm=None,
         actor_scope="Actor",
         target_scope="ActorTarget")
 
@@ -36,6 +37,7 @@ def ddpg_test():
         # using SGD for easier debugging
         batch_norm=True,
         opitmizer_name="sgd",
+        max_gradient_norm=None,
         critic_scope="Critic",
         target_scope="CriticTarget")
 

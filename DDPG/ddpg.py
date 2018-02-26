@@ -6,8 +6,10 @@ https://github.com/pemami4911/deep-rl/blob/master/ddpg/ddpg.py
 import warnings
 import numpy as np
 from namedlist import namedlist
+import tensorflow_utils as tf_utils
 from rl_utils import ReplayBuffer
 from rl_utils import OrnsteinUhlenbeckActionNoise
+
 
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import array_ops
@@ -39,6 +41,7 @@ class SingleEpisodeDDPGController(object):
                  actor_activation=math_ops.sigmoid,
                  critic_activation=None,
                  opitmizer_name="adam",
+                 max_gradient_norm=5.0,
                  actor_scope=None,
                  critic_scope=None,
                  actor_target_scope=None,
@@ -58,6 +61,7 @@ class SingleEpisodeDDPGController(object):
             tau=tau,
             activation=actor_activation,
             opitmizer_name=opitmizer_name,
+            max_gradient_norm=max_gradient_norm,
             actor_scope=actor_scope,
             target_scope=actor_target_scope)
 
@@ -71,6 +75,7 @@ class SingleEpisodeDDPGController(object):
             gamma=gamma,
             activation=critic_activation,
             opitmizer_name=opitmizer_name,
+            max_gradient_norm=max_gradient_norm,
             critic_scope=critic_scope,
             target_scope=critic_target_scope)
 
@@ -199,6 +204,7 @@ class ActorNetwork(object):
                  activation=math_ops.tanh,
                  batch_norm=True,
                  opitmizer_name="adam",
+                 max_gradient_norm=5.0,
                  actor_scope=None,
                  target_scope=None):
         self._sess = sess
@@ -257,6 +263,11 @@ class ActorNetwork(object):
             # the action-value gradients
             grad_ys=-action_gradients)
         
+        # clip gradients
+        if max_gradient_norm:
+            actor_gradients, _, _ = tf_utils.gradient_clip(
+                actor_gradients, max_gradient_norm=max_gradient_norm)
+
         # Optimization Op
         optimizer = create_optimizer(opitmizer_name, learning_rate)
         optimization_op = optimizer.apply_gradients(
@@ -369,6 +380,7 @@ class CriticNetwork(object):
                  activation=None,
                  batch_norm=True,
                  opitmizer_name="adam",
+                 max_gradient_norm=5.0,
                  critic_scope=None,
                  target_scope=None):
         if activation and not callable(activation):
@@ -416,9 +428,17 @@ class CriticNetwork(object):
         critic_loss = nn_ops.l2_loss(TD_target - critic_outputs)
         critic_loss = math_ops.div(critic_loss, batch_size)
         
+        # Gradients
+        critic_gradients = gradients_impl.gradients(critic_loss, critic_params)
+        # clip gradients
+        if max_gradient_norm:
+            critic_gradients, _, _ = tf_utils.gradient_clip(
+                critic_gradients, max_gradient_norm=max_gradient_norm)
+        
         # optimization
         optimizer = create_optimizer(opitmizer_name, learning_rate)
-        optimization_op = optimizer.minimize(critic_loss)
+        optimization_op = optimizer.apply_gradients(
+            zip(critic_gradients, critic_params))
         
 
         # Get the gradient of the net w.r.t. the action.
