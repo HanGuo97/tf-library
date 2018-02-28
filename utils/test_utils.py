@@ -7,6 +7,10 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error
 
 
+def create_scope(name):
+    with tf.variable_scope(name) as scope:
+        pass
+    return scope
 
 
 def random_integers(low, high, shape, dtype=tf.int32):
@@ -39,6 +43,14 @@ def check_inequality(A, B, descip="", tolerance=1e-3):
     print("SSE: %.11f\t%s: %r" % (diff, descip, diff > tolerance))
 
 
+def tensor_is_zero(sess, tensor, msg=None):
+    is_zero = (sess.run(tensor) == 0).all()
+    if msg:
+        print(" ".join([msg, "= 0 %s" % ("PASSED" if is_zero else "FAILED")]))
+    
+    return is_zero
+
+
 def L2_distance(X, Y, mean=False):
     # MSE = doubled_l2 / batch_size
     # L2 = doubled_l2 / 2
@@ -53,6 +65,12 @@ def L2_distance(X, Y, mean=False):
 
 def test_message(msg):
     print("\n\n\nTESTING:\t" + msg + "\n\n\n")
+
+
+class DictClass(object):
+    def __init__(self, dictionary):
+        for k, v in dictionary.items():
+            setattr(self, k, v)
 
 
 ################################################
