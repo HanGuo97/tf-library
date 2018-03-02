@@ -7,8 +7,8 @@ import warnings
 import numpy as np
 from namedlist import namedlist
 import tensorflow_utils as tf_utils
-from rl_utils import ReplayBuffer
-from rl_utils import OrnsteinUhlenbeckActionNoise
+from utils.misc_utils import ReplayBuffer
+from utils.misc_utils import OrnsteinUhlenbeckActionNoise
 
 
 from tensorflow.python.ops import math_ops
