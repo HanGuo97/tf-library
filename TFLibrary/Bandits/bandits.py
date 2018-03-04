@@ -2,6 +2,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
 
+import os
+import pickle
 import numpy as np
 from namedlist import namedlist
 
@@ -59,9 +61,9 @@ def incremental_weighted_mean(V, W, C, G):
     return _V, _C
 
 
-def moving_mean(old_mean, new_value, weight):
-    new_mean = old_mean + weight * (new_value - old_mean)
-    return new_mean
+def gradient_bandit(old_Q, reward, alpha):
+    new_Q = old_Q + alpha * (reward - old_Q)
+    return new_Q
 
 
 def convert_to_one_hot(action_id, action_space):
@@ -79,14 +81,18 @@ class MultiArmedBanditSelector(object):
     def __init__(self,
                  num_actions,
                  Q_initial,
+                 update_method="average",
                  initial_temperature=1.0,
                  temperature_anneal_rate=None,
                  log_history=True):
-        
+        if update_method not in ["average", "gradient_bandit"]:
+            raise ValueError("Unknown update_method ", update_method)
+
         self._Q_values = [
             Q_Entry(Value=Q_initial, Count=1)
             for _ in range(num_actions)]
         self._num_actions = num_actions
+        self._update_method = update_method
         self._temperature = initial_temperature
         self._temperature_anneal_rate = temperature_anneal_rate
         
@@ -102,7 +108,7 @@ class MultiArmedBanditSelector(object):
         """
         temperature_coef = (
             np.power(self._temperature_anneal_rate, step)
-            if self._temperature_anneal_rate else 1)
+            if self._temperature_anneal_rate is not None else 1)
 
         chosen_action, Q_probs = boltzmann_exploration(
             Q_values=np.asarray(self.expected_Q_values),
@@ -125,14 +131,42 @@ class MultiArmedBanditSelector(object):
         if not index < self._num_actions:
             raise ValueError("index out of range")
 
-        new_Q, new_C = incremental_weighted_mean(
-            G=new_Q_value, W=1,
-            V=self._Q_values[index].Value,
-            C=self._Q_values[index].Count)
-        self._Q_values[index].Value = new_Q
-        self._Q_values[index].Count = new_C
+        if self._update_method == "average":
+            new_Q, new_C = incremental_weighted_mean(
+                G=new_Q_value, W=1,
+                V=self._Q_values[index].Value,
+                C=self._Q_values[index].Count)
+            self._Q_values[index].Value = new_Q
+            self._Q_values[index].Count = new_C
 
+        elif self._update_method == "gradient_bandit":
+            new_Q = gradient_bandit(
+                reward=new_Q_value, alpha=0.9,
+                old_Q=self._Q_values[index].Value)
+            self._Q_values[index].Value = new_Q
+            self._Q_values[index].Count += 1
 
     @property
     def expected_Q_values(self):
         return [Q.Value for Q in self._Q_values]
+
+    def save(self, file_dir):
+        with open(file_dir, "wb") as f:
+            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+
+        print("INFO: Successfully Saved MABSelector to ", file_dir)
+
+    def load(self, file_dir):
+        if not os.path.exists(file_dir):
+            raise ValueError("File not exist ", file_dir)
+
+        with open(file_dir, "rb") as f:
+            dump = pickle.load(f)
+
+        if not self._num_actions == dump._num_actions:
+            raise ValueError("num_actions incompatible")
+        
+        self._Q_values = dump._Q_values
+        self._histories = dump._histories
+
+        print("INFO: Successfully Loaded MABSelector from ", file_dir)

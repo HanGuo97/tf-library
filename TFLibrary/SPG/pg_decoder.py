@@ -10,7 +10,7 @@ from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.layers import core as core_layers
 from tensorflow.python.ops.distributions import categorical
 
-from SPG import attention_utils
+from TFLibrary.SPG import attention_utils
 
 ZERO_TOLERANCE = 1e-6
 

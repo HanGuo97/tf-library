@@ -2,26 +2,13 @@ import tensorflow as tf
 # import tensorflow.contrib.eager as tfe
 # tfe.enable_eager_execution()
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import check_ops
-from tensorflow.python.ops import clip_ops
-from tensorflow.python.ops import functional_ops
-from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import nn_ops
-from tensorflow.python.ops import random_ops
 from tensorflow.python.ops import rnn_cell_impl
-from tensorflow.python.ops import tensor_array_ops
 from tensorflow.python.ops import variable_scope as vs
-from tensorflow.python.util import nest
-from tensorflow.python.layers import base as layers_base
-from tensorflow.python.layers import core as layers_core
-from tensorflow.python.framework import ops
-from tensorflow.python.framework import dtypes
-from tensorflow.python.framework import tensor_shape
 
-from SPG import pg_decoder
-from utils import test_utils
-from utils import attention_utils
+from TFLibrary.SPG import pg_decoder
+from TFLibrary.utils import test_utils
+from TFLibrary.utils import attention_utils
 _zero_state_tensors = rnn_cell_impl._zero_state_tensors
 
 print("Using Tensorflow ", tf.__version__)
@@ -84,7 +71,7 @@ def _test_seq2seq_attention_pointer():
     (final_dists, final_cell_state, attn_dists, p_gens,
      coverage, sampled_tokens, decoder_outputs_ta,
      debug_variables, final_loop_state) = (
-        pg_decoder.policy_gradient_decoder(
+        pg_decoder.policy_gradient_pointer_attention_decoder(
             cell=cell,
             scope=Scope,
             memory=encoder_states,
@@ -381,3 +368,7 @@ def _calc_final_dist(self, vocab_dists, attn_dists):
             vocab_dists_extended, attn_dists_projected)]
 
         return final_dists
+
+
+if __name__ == "__main__":
+    test()

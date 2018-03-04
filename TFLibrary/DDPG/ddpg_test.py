@@ -4,8 +4,8 @@ import tensorflow as tf
 import autograd
 import autograd.numpy as np   # Thinly-wrapped version of Numpy
 
-from DDPG import ddpg
-from utils import test_utils
+from TFLibrary.DDPG import ddpg
+from TFLibrary.utils import test_utils
 
 print("Using Tensorflow ", tf.__version__)
 
@@ -456,3 +456,7 @@ def critic_fn(S, A, Ws, Wa, b):
     """Q = S Ws + A Wa + b"""
     Q = np.matmul(S, Ws) + np.matmul(A, Wa) + b
     return Q
+
+
+if __name__ == "__main__":
+    ddpg_test()

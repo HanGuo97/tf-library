@@ -6,9 +6,10 @@ https://github.com/pemami4911/deep-rl/blob/master/ddpg/ddpg.py
 import warnings
 import numpy as np
 from namedlist import namedlist
-import tensorflow_utils as tf_utils
-from utils.misc_utils import ReplayBuffer
-from utils.misc_utils import OrnsteinUhlenbeckActionNoise
+
+from TFLibrary.utils.misc_utils import ReplayBuffer
+from TFLibrary.utils.misc_utils import OrnsteinUhlenbeckActionNoise
+from TFLibrary.utils import tensorflow_utils as tf_utils
 
 
 from tensorflow.python.ops import math_ops

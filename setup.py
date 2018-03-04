@@ -7,7 +7,7 @@ def read(fname):
 
 
 setup(
-    name="TFLibs",
+    name="TFLibrary",
     version="0.1",
     packages=find_packages(),
     description="Tensorflow helper library",
