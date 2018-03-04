@@ -7,4 +7,5 @@ Deep Deterministic Policy Gradient
 
 # Installation
 ```console
-pip install -e .```
+pip install -e .
+```
