@@ -6,6 +6,6 @@ Multi-Armed Bandits with Boltzmann Exploration
 Deep Deterministic Policy Gradient
 
 # Installation
-```console
+```sh
 pip install -e .
 ```
