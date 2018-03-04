@@ -13,6 +13,6 @@ setup(
     description="Tensorflow helper library",
     long_description=read("README.md"),
     install_requires=[
-        "numpy", "tensorflow>=1.5.0",
+        "numpy", "tensorflow-gpu>=1.5.0",
     ],
 )
