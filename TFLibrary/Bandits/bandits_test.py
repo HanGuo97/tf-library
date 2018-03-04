@@ -53,7 +53,7 @@ def test_average_update(controller):
 
 
 def test_gradient_update(controller):
-    alpha = 0.9
+    alpha = 0.3
     randints = []
     num_actions = controller._num_actions
     Q_initial = controller._Q_values[0].Value

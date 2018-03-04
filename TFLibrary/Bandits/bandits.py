@@ -141,7 +141,7 @@ class MultiArmedBanditSelector(object):
 
         elif self._update_method == "gradient_bandit":
             new_Q = gradient_bandit(
-                reward=new_Q_value, alpha=0.9,
+                reward=new_Q_value, alpha=0.3,
                 old_Q=self._Q_values[index].Value)
             self._Q_values[index].Value = new_Q
             self._Q_values[index].Count += 1
