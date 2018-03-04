@@ -6,7 +6,7 @@ from TFLibrary.Bandits import bandits
 from TFLibrary.utils import test_utils
 
 
-def bandits_test():
+def test():
     num_actions = 9
     selector_Q_initial = -2
     average_controller = bandits.MultiArmedBanditSelector(
@@ -105,4 +105,4 @@ def test_saving_and_loading(a_controller, another_controller):
 
 
 if __name__ == "__main__":
-    bandits_test()
+    test()

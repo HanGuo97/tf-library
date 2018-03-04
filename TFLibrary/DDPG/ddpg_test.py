@@ -10,7 +10,7 @@ from TFLibrary.utils import test_utils
 print("Using Tensorflow ", tf.__version__)
 
 
-def ddpg_test():
+def test():
     sess = tf.Session()
     actor = ddpg.ActorNetwork(
         sess=sess,
@@ -459,4 +459,4 @@ def critic_fn(S, A, Ws, Wa, b):
 
 
 if __name__ == "__main__":
-    ddpg_test()
+    test()
