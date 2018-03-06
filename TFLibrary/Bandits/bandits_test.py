@@ -18,8 +18,20 @@ def test():
     gradient_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
         Q_initial=selector_Q_initial,
-        update_method="gradient_bandit")
-    test_gradient_update(gradient_controller)
+        update_method="gradient_bandit", alpha=0.30)
+    test_gradient_update(gradient_controller, alpha=0.30)
+
+    gradient_controller = bandits.MultiArmedBanditSelector(
+        num_actions=num_actions,
+        Q_initial=selector_Q_initial,
+        update_method="gradient_bandit", alpha=0.5)
+    test_gradient_update(gradient_controller, alpha=0.5)
+
+    gradient_controller = bandits.MultiArmedBanditSelector(
+        num_actions=num_actions,
+        Q_initial=selector_Q_initial,
+        update_method="gradient_bandit", alpha=0.7)
+    test_gradient_update(gradient_controller, alpha=0.7)
 
     a_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
@@ -52,8 +64,7 @@ def test_average_update(controller):
             controller._Q_values[i].Value, expected_value))
 
 
-def test_gradient_update(controller):
-    alpha = 0.3
+def test_gradient_update(controller, alpha=0.3):
     randints = []
     num_actions = controller._num_actions
     Q_initial = controller._Q_values[0].Value

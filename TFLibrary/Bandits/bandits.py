@@ -82,6 +82,7 @@ class MultiArmedBanditSelector(object):
                  num_actions,
                  Q_initial,
                  update_method="average",
+                 alpha=0.3,
                  initial_temperature=1.0,
                  temperature_anneal_rate=None,
                  log_history=True):
@@ -93,6 +94,8 @@ class MultiArmedBanditSelector(object):
             for _ in range(num_actions)]
         self._num_actions = num_actions
         self._update_method = update_method
+
+        self._alpha = alpha
         self._temperature = initial_temperature
         self._temperature_anneal_rate = temperature_anneal_rate
         
@@ -141,7 +144,8 @@ class MultiArmedBanditSelector(object):
 
         elif self._update_method == "gradient_bandit":
             new_Q = gradient_bandit(
-                reward=new_Q_value, alpha=0.3,
+                reward=new_Q_value,
+                alpha=self._alpha,
                 old_Q=self._Q_values[index].Value)
             self._Q_values[index].Value = new_Q
             self._Q_values[index].Count += 1
