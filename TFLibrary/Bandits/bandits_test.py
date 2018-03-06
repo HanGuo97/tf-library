@@ -18,8 +18,8 @@ def test():
     gradient_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
         Q_initial=selector_Q_initial,
-        update_method="gradient_bandit", alpha=0.30)
-    test_gradient_update(gradient_controller, alpha=0.30)
+        update_method="gradient_bandit", alpha=0.3)
+    test_gradient_update(gradient_controller, alpha=0.3)
 
     gradient_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
