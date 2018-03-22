@@ -121,6 +121,7 @@ class MultiArmedBanditSelector(object):
 
         elif self._update_method in ["exp3"]:
             Q_probs = [Q.Count for Q in self._Q_values]
+            Q_probs = [Q / sum(Q_probs) for Q in Q_probs]
             chosen_action = np.random.choice(self._num_actions, p=Q_probs)
 
 
