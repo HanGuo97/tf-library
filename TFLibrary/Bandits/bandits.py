@@ -6,6 +6,7 @@ import os
 import pickle
 import numpy as np
 from namedlist import namedlist
+from TFLibrary.Bandits import exp3
 
 Q_Entry = namedlist("Q_Entry", ("Value", "Count"))
 
@@ -86,7 +87,7 @@ class MultiArmedBanditSelector(object):
                  initial_temperature=1.0,
                  temperature_anneal_rate=None,
                  log_history=True):
-        if update_method not in ["average", "gradient_bandit"]:
+        if update_method not in ["average", "gradient_bandit", "exp3"]:
             raise ValueError("Unknown update_method ", update_method)
 
         self._Q_values = [
@@ -109,13 +110,19 @@ class MultiArmedBanditSelector(object):
         If return probs, return the selection
         distributions otherwise, return the sampled actions
         """
-        temperature_coef = (
-            np.power(self._temperature_anneal_rate, step)
-            if self._temperature_anneal_rate is not None else 1)
+        if self._update_method in ["average", "gradient_bandit"]:
+            temperature_coef = (
+                np.power(self._temperature_anneal_rate, step)
+                if self._temperature_anneal_rate is not None else 1)
 
-        chosen_action, Q_probs = boltzmann_exploration(
-            Q_values=np.asarray(self.expected_Q_values),
-            temperature=self._temperature * temperature_coef)
+            chosen_action, Q_probs = boltzmann_exploration(
+                Q_values=np.asarray(self.expected_Q_values),
+                temperature=self._temperature * temperature_coef)
+
+        elif self._update_method in ["exp3"]:
+            Q_probs = [Q.Count for Q in self._Q_values]
+            chosen_action = np.random.choice(self._num_actions, p=Q_probs)
+
 
         if self._log_history:
             self._histories.append([Q_probs, chosen_action])
@@ -149,6 +156,20 @@ class MultiArmedBanditSelector(object):
                 old_Q=self._Q_values[index].Value)
             self._Q_values[index].Value = new_Q
             self._Q_values[index].Count += 1
+
+        elif self._update_method == "exp3":
+            probs, new_weights = exp3.exp3_update(
+                sampled=index,
+                # non-sampled rewards will be cast to 0.
+                rewards=[new_Q_value for _ in range(self._num_actions)],
+                probs=[Q.Count for Q in self._Q_values],
+                weights=[Q.Value for Q in self._Q_values],
+                gamma=self._alpha)
+
+            for index in range(self._num_actions):
+                self._Q_values[index].Count = probs[index]
+                self._Q_values[index].Value = new_weights[index]
+
 
     @property
     def expected_Q_values(self):
