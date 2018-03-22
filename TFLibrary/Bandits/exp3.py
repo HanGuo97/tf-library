@@ -13,7 +13,7 @@ def exp3_update(sampled, rewards, probs, weights, gamma):
     if not len(rewards) == len(weights):
         raise ValueError("rewards and weights have different shapes")
     if rewards < 0 or rewards > 1:
-        raise ValueError("rewards must be in [0,1]")
+        raise ValueError("rewards must be in [0,1], but is ", rewards)
 
     K = len(rewards)
     new_weights = copy.deepcopy(weights)
