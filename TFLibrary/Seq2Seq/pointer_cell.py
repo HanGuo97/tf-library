@@ -27,7 +27,9 @@ from tensorflow.python.util import nest
 
 from tensorflow.python.layers import core as core_layers
 from tensorflow.python.ops.distributions import categorical
+from tensorflow.contrib.seq2seq.python.ops import helper as helper_ops
 from tensorflow.contrib.seq2seq.python.ops import attention_wrapper as seq2seq_ops
+
 
 from collections import namedtuple
 from TFLibrary.Seq2Seq import attention_utils
@@ -49,7 +51,7 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
     weighted_P_vocab = p_gen * vocab_dist
     # (1 - P(gen)) x P(attention)
     weighted_P_copy = (1 - p_gen) * attn_dist
-    
+
     # get the word-idx for all words
     extended_vsize = vocab_size + num_source_OOVs
     # placeholders to OOV words
@@ -57,10 +59,10 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
     # this distribution span the entire words
     weighted_P_vocab_extended = tf.concat(
         axis=1, values=[weighted_P_vocab, extra_zeros])
-    
+
     # assign probabilities from copy distribution
     # into correspodning positions in extended_vocab_dist
-    
+
     # to do this, we need to use scatter_nd
     # scatter_nd (in this case) requires two numbers
     # one is the index in batch-dimension
@@ -70,7 +72,7 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
     #  [2, 2, 2, 2, 2, ...],
     #  [...]
     #  [N, N, N, N, N, ...]]
-    
+
     # [1, 2, ..., N]
     # to [[1], [2], ..., [N]]
     # and finally to the final shape
@@ -78,7 +80,7 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
     batch_nums = tf.range(0, limit=batch_size)
     batch_nums = tf.expand_dims(batch_nums, 1)
     batch_nums = tf.tile(batch_nums, [1, enc_seq_len])
-    
+
     # stick together batch-dim and index-dim
     indices = tf.stack((batch_nums, enc_batch_extended_vocab), axis=2)
     scatter_shape = [batch_size, extended_vsize]
@@ -86,7 +88,7 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
     # into the word-indices
     weighted_P_copy_projected = tf.scatter_nd(
         indices, weighted_P_copy, scatter_shape)
-    
+
     # Add the vocab distributions and the copy distributions together
     # to get the final distributions, final_dists is a list length
     # max_dec_steps; each entry is (batch_size, extended_vsize)
@@ -98,16 +100,17 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
     return final_dists
 
 
-
 _zero_state_tensors = rnn_cell_impl._zero_state_tensors
-PointerWrapperState = namedtuple("PointerWrapperState",
-    ("cell_state", "time",  # RNN Cells
-     "attention", "alignments", "alignment_history",  # Attentions
-     "p_gen", "coverage", "p_gen_history", "coverage_history"))  # Pointers
+PointerWrapperState = namedtuple(
+    "PointerWrapperState",
+    ("cell_state", "time",  # RNN Cell
+    "attention", "alignments", "alignment_history",  # Attention
+    "p_gen", "coverage", "p_gen_history", "coverage_history",
+    "logits_history", "vocab_dists_history", "final_dists_history"))  # Pointer
 
 
+class PointerWrapper(rnn_cell_impl.RNNCell):
 
-class PointerWrapperState(rnn_cell_impl.RNNCell):
     def __init__(self,
                  cell,
                  # attention
@@ -118,39 +121,54 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
                  output_attention=True,
                  # pointer
                  coverage=False,
+                 batch_size=None,
+                 vocab_size=None,
+                 num_source_OOVs=None,
+                 enc_batch_extended_vocab=None,
+                 probability_fn=None,
                  # misc
                  initial_cell_state=None,
                  name=None,
                  attention_scope=None,
                  pointer_scope=None):
 
-        super(PointerWrapperState, self).__init__(name=name)
-        if not rnn_cell_impl._like_rnncell(cell):  # pylint: disable=protected-access
+        super(PointerWrapper, self).__init__(name=name)
+        if coverage:
+            raise NotImplementedError("Not Supported")
+
+        if initial_cell_state:
+            raise NotImplementedError("Not Supported")
+
+        if not rnn_cell_impl._like_rnncell(cell):
             raise TypeError(
                 "cell must be an RNNCell, saw type: %s" % type(cell).__name__)
-        
+
         if not isinstance(attention_mechanism, seq2seq_ops.AttentionMechanism):
             raise TypeError(
                 "attention_mechanism must be an AttentionMechanism or list of "
                 "multiple AttentionMechanism instances, saw type: %s"
                 % type(attention_mechanism).__name__)
 
+        
         if cell_input_fn is None:
             cell_input_fn = (lambda inputs, attention:
-                array_ops.concat([inputs, attention], -1))
-        else:
-            if not callable(cell_input_fn):
-                raise TypeError(
-                    "cell_input_fn must be callable, saw type: %s"
-                    % type(cell_input_fn).__name__)
+                             array_ops.concat([inputs, attention], -1))
+        if probability_fn is None:
+            probability_fn = nn_ops.softmax
+
+        if not callable(cell_input_fn):
+            raise TypeError("cell_input_fn must be callable")
+        if not callable(probability_fn):
+            raise TypeError("probability_fn should be callable")
+
 
         if attention_layer_size is not None:
             # assert this for now
             # but can be relaxed in future versions
             if attention_layer_size != cell.output_size:
                 raise ValueError("Current version of PointerWrapper"
-                    " only supports having same attention layer size"
-                    " with cell.output_size")
+                                 " only supports having same attention"
+                                 " layer size with cell.output_size")
 
             attention_layer = layers_core.Dense(
                 units=attention_layer_size,
@@ -158,15 +176,13 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
                 use_bias=False,
                 dtype=attention_mechanism.dtype)
 
-        if coverage:
-            raise NotImplementedError("Not Supported")
-
-        if initial_cell_state:
-            raise NotImplementedError("Not Supported")
-
         pgen_layer = core_layers.Dense(
             units=1, activation=tf.sigmoid,
             use_bias=True, name="pgen_kernel")
+
+        logits_layer = core_layers.Dense(
+            units=vocab_size,
+            use_bias=True, name="logits_layer")
 
         self._cell = cell
         self._attention_mechanism = attention_mechanism
@@ -174,12 +190,20 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
         self._cell_input_fn = cell_input_fn
         self._output_attention = output_attention
         self._alignment_history = alignment_history
-        self._attention_scope = attention_scope
-        self._pointer_scope = pointer_scope
 
-        self._attention_layer = attention_layer
         self._pgen_layer = pgen_layer
-    
+        self._logits_layer = logits_layer
+        self._attention_layer = attention_layer
+
+        self._pointer_scope = pointer_scope
+        self._attention_scope = attention_scope
+
+        self._vocab_size = vocab_size
+        self._batch_size = batch_size
+        self._probability_fn = probability_fn
+        self._num_source_OOVs = num_source_OOVs
+        self._enc_batch_extended_vocab = enc_batch_extended_vocab
+
     @property
     def output_size(self):
         if self._output_attention:
@@ -207,9 +231,10 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
             # coverage = sum(alignments)
             coverage=self._attention_mechanism.alignments_size,
             p_gen_history=(),
-            coverage_history=())
-
-
+            coverage_history=(),
+            logits_history=(),
+            vocab_dists_history=(),
+            final_dists_history=())
 
     def zero_state(self, batch_size, dtype):
         """Return an initial (zero) state tuple for this `AttentionWrapper`.
@@ -235,15 +260,26 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
                 dtype=dtype)
             zero_alignments = self._attention_mechanism.initial_alignments(
                 batch_size=batch_size, dtype=dtype)
+            zero_coverage = self._attention_mechanism.initial_alignments(
+                batch_size=batch_size, dtype=dtype)
+
+            # all kinds of histories
             zero_alignment_history = (tensor_array_ops.TensorArray(
                 dtype=dtype, size=0, dynamic_size=True)
                 if self._alignment_history else ())
-            zero_coverage = self._attention_mechanism.initial_alignments(
-                batch_size=batch_size, dtype=dtype)
             zero_p_gen_history = (tensor_array_ops.TensorArray(
                 dtype=dtype, size=0, dynamic_size=True)
                 if self._alignment_history else ())
             zero_coverage_history = (tensor_array_ops.TensorArray(
+                dtype=dtype, size=0, dynamic_size=True)
+                if self._alignment_history else ())
+            zero_logits_history = (tensor_array_ops.TensorArray(
+                dtype=dtype, size=0, dynamic_size=True)
+                if self._alignment_history else ())
+            zero_vocab_dists_history = (tensor_array_ops.TensorArray(
+                dtype=dtype, size=0, dynamic_size=True)
+                if self._alignment_history else ())
+            zero_final_dists_history = (tensor_array_ops.TensorArray(
                 dtype=dtype, size=0, dynamic_size=True)
                 if self._alignment_history else ())
 
@@ -259,13 +295,16 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
                 p_gen=array_ops.zeros([1], dtype=dtypes.int32),
                 coverage=zero_coverage,
                 p_gen_history=zero_p_gen_history,
-                coverages_history=zero_coverage_history)
-    
+                coverages_history=zero_coverage_history,
+                logits_history=zero_logits_history,
+                vocab_dists_history=zero_vocab_dists_history,
+                final_dists_history=zero_final_dists_history)
+
     def call(self, inputs, state):
         if not isinstance(state, PointerWrapperState):
             raise TypeError("Expected state to be instance "
-                "of AttentionWrapperState. "
-                "Received type %s instead." % type(state))
+                            "of AttentionWrapperState. "
+                            "Received type %s instead." % type(state))
 
         # Step 1: Calculate the true inputs to the cell based on the
         # previous attention value.
@@ -276,32 +315,51 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
             cell_states=next_cell_state)
 
         # Step 2: Compute attention and write to history
-        with variable_scope.variable_scope(
-                self._attention_scope, reuse=tf.AUTO_REUSE):
+        with variable_scope.variable_scope(self._attention_scope,
+                                           reuse=tf.AUTO_REUSE):
 
-            attention, alignments, context = attention_utils._compute_attention(
-                attention_mechanism=self._attention_mechanism,
-                cell_output=cell_output,
-                attention_state=None,
-                attention_layer=(self._attention_layer
-                                 if self._attention_layer else None))
+            (attention, alignments, context) = (
+                attention_utils._compute_attention(
+                    attention_mechanism=self._attention_mechanism,
+                    cell_output=cell_output,
+                    attention_state=None,
+                    attention_layer=(self._attention_layer
+                        if self._attention_layer else None)))
 
-            alignment_history = state.alignment_history.write(
-                state.time, alignments) if self._alignment_history else ()
 
         # Step 3: Compute pointer and coverage and write to histories
-        with variable_scope.variable_scope(
-                self._pointer_scope, reuse=tf.AUTO_REUSE):
+        with variable_scope.variable_scope(self._pointer_scope,
+                                           reuse=tf.AUTO_REUSE):
 
             p_gen = self._pgen_layer(array_ops.concat([
                 context, last_layer_state.c,
                 last_layer_state.h, cell_inputs], -1))
 
-            # update p_gens_history distributions
-            p_gen_history = state.p_gen_history.write(
-                state.time, p_gen)
+
+        # Step 4: calculating final distribution
+        logits = self._logits_layer(attention)
+        vocab_dist = self._probability_fn(logits)
+        
+        final_dist = _calc_final_dist(
+            vocab_dist=vocab_dist,
+            attn_dist=alignments,
+            p_gen=p_gen,
+            batch_size=self._batch_size,
+            vocab_size=self._vocab_size,
+            num_source_OOVs=self._num_source_OOVs,
+            enc_batch_extended_vocab=self._enc_batch_extended_vocab)
 
 
+        # Step 5: log histories
+        time = state.time
+        alignment_history = state.alignment_history.write(
+            time, alignments) if self._alignment_history else ()
+        p_gen_history = state.p_gen_history.write(time, p_gen)
+        logits_history = state.logits_history.write(time, logits)
+        vocab_dists_history = state.vocab_dists_history.write(time, vocab_dist)
+        final_dists_history = state.final_dists_history.write(time, final_dist)
+
+        
         next_state = PointerWrapperState(
             # Cells
             time=state.time + 1,
@@ -314,26 +372,20 @@ class PointerWrapperState(rnn_cell_impl.RNNCell):
             p_gen=p_gen,
             coverage=state.coverage,
             p_gen_history=p_gen_history,
+            logits_history=logits_history,
+            vocab_dists_history=vocab_dists_history,
+            final_dists_history=final_dists_history,
+            # not used at now
             coverages_history=state.coverages_history)
-    
+
         if self._output_attention:
             return attention, next_state
         else:
             return cell_output, next_state
 
+            
 
-
-
-
-
-
-
-
-
-
-
-
-
+    
 
 
 def policy_gradient_pointer_attention_decoder(
@@ -364,12 +416,13 @@ def policy_gradient_pointer_attention_decoder(
     # if initial_state_attention:
     #     raise NotImplementedError
     if use_coverage or prev_coverage:
-        # there is a problem in coverage, see Line 216 - 221 in original attention_decoder
+                # there is a problem in coverage, see Line 216 - 221 in original
+                # attention_decoder
         raise NotImplementedError
 
     if reinforce and ((embeddings is None) or (start_tokens is None)):
         raise ValueError("when using reinforce, "
-            "please provide embeddings and start_tokens")
+                         "please provide embeddings and start_tokens")
 
     print("TODO: Using tf.where to replace tf.cond in next_cell_input")
     print("change sampled_tokens not include <start>?")
@@ -420,7 +473,7 @@ def policy_gradient_pointer_attention_decoder(
         logits_kernel = core_layers.Dense(
             units=vocab_size,
             use_bias=True, name="logits_kernel")
-        
+
         # Get the weight matrix W_h and apply it to each encoder state to get
         # (W_h h_i), the encoder features
         # shape (batch_size,attn_length,1,attention_vec_size)
@@ -515,7 +568,7 @@ def policy_gradient_pointer_attention_decoder(
                     dtype=tf.float32, size=0, dynamic_size=True)
                 sampled_tokens_history = tensor_array_ops.TensorArray(
                     dtype=tf.int32, size=0, dynamic_size=True)
-                
+
                 # mostly used in debugging
                 logits_history = tensor_array_ops.TensorArray(
                     dtype=tf.float32, size=0, dynamic_size=True)
@@ -523,7 +576,7 @@ def policy_gradient_pointer_attention_decoder(
                     dtype=tf.float32, size=0, dynamic_size=True)
                 final_dists_history = tensor_array_ops.TensorArray(
                     dtype=tf.float32, size=0, dynamic_size=True)
-                
+
             else:
                 # normal workflow:
                 # decoder_inputs = input_kernel(inputs; context)
@@ -559,7 +612,7 @@ def policy_gradient_pointer_attention_decoder(
                     # or scope.Attention.reuse):
                     context_vector, attn_dist, coverage = _compute_attention(
                         cell_output=cell_output, coverage=coverage)
-                    
+
                     # Concatenate the cell_output (= decoder state)
                     # and the context vector, and pass them through
                     # a linear layer. This is V[s_t, h*_t] + b in the paper
@@ -594,7 +647,7 @@ def policy_gradient_pointer_attention_decoder(
                 # distribution
                 logits = logits_kernel(attention_output)
                 vocab_dist = nn_ops.softmax(logits)
-                
+
                 final_dist = _calc_final_dist(
                     vocab_dist=vocab_dist,
                     attn_dist=attn_dist,
@@ -690,10 +743,9 @@ def policy_gradient_pointer_attention_decoder(
                 outputs_history, alignments_history, p_gens_history,
                 coverages_history, logits_history, vocab_dists_history,
                 final_dists_history, coverage, next_cell_input)
-            
+
             return (elements_finished, next_cell_input, next_cell_state,
                     emit_output, next_loop_state)
-
 
         with tf.variable_scope("policy"):
             (decoder_outputs_ta,
