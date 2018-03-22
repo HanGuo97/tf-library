@@ -15,13 +15,13 @@ from TFLibrary.Data.data2text.original_data_utils import extract_numbers, extrac
 
 
 EntityEntry = namedtuple("EntityEntry",
-    ("WindowLeft", "WindowRight", "Token", "IsPronoun"))
+                         ("WindowLeft", "WindowRight", "Token", "IsPronoun"))
 NumberEntry = namedtuple("NumberEntry",
-    ("WindowLeft", "WindowRight", "Token"))
+                         ("WindowLeft", "WindowRight", "Token"))
 RelationEntry = namedtuple("RelationEntry",
-    ("Entity", "Number", "Label", "PlayerID_or_TeamIsHome"))
+                           ("Entity", "Number", "Label", "PlayerID_or_TeamIsHome"))
 CandidateRelations = namedtuple("CandidateRelations",
-    ("Tokens", "Relations"))
+                                ("Tokens", "Relations"))
 
 
 def _flatten(L):
@@ -33,7 +33,7 @@ def _process_compound_words(entities):
         "II", "III", "Jr.", "Jr",
         "II".lower(), "III".lower(),
         "Jr.".lower(), "Jr".lower()]
-    
+
     additional_entities = []
     for entity in entities:
         # split phrases into tokens
@@ -50,12 +50,12 @@ def _process_compound_words(entities):
                     additional_entities.append(token)
 
     return additional_entities
-                
+
 
 def extract_entities_from_json(json_file, lower=True):
     with codecs.open(json_file, "r", "utf-8") as f:
         raw_data = json.load(f)
-    
+
     teams = []
     cities = []
     players = []
@@ -71,20 +71,20 @@ def extract_entities_from_json(json_file, lower=True):
             entry["vis_line"]["TEAM-NAME"],
             " ".join([entry["vis_city"], entry["vis_name"]]),
             " ".join([entry["vis_city"], entry["vis_line"]["TEAM-NAME"]])]
-        
+
         # special case for this
         if entry["vis_city"] == "Los Angeles":
             teams.append("LA" + entry["vis_name"])
         if entry["home_city"] == "Los Angeles":
             teams.append("LA" + entry["home_name"])
-            
+
         # sometimes team_city is different
         cities += (
             [entry["home_city"], entry["vis_city"]] +
             list(entry["box_score"]["TEAM_CITY"].values()))
-        
+
         players += entry["box_score"]["PLAYER_NAME"].values()
-        
+
     teams += _process_compound_words(teams)
     cities += _process_compound_words(cities)
     players += _process_compound_words(players)
@@ -92,7 +92,7 @@ def extract_entities_from_json(json_file, lower=True):
     teams = set(teams)
     cities = set(cities)
     players = set(players)
-    
+
     if lower:
         # in debugging, will not use lower
         # to compare against original implementation
@@ -100,10 +100,9 @@ def extract_entities_from_json(json_file, lower=True):
         teams = set(map(lambda s: s.lower(), teams))
         cities = set(map(lambda s: s.lower(), cities))
         players = set(map(lambda s: s.lower(), players))
-        
+
     all_entities = players | teams | cities
     return all_entities, players, teams, cities
-    
 
 
 def process_candidate_rels(entry, summary,
@@ -116,7 +115,7 @@ def process_candidate_rels(entry, summary,
         tokens = sentence.split()
         numbers = extract_numbers(tokens)
         entities = extract_entities(tokens, all_entities, pronouns)
-        
+
         # make them named tuples
         numbers = [NumberEntry(*num) for num in numbers]
         entities = [EntityEntry(*ent) for ent in entities]
@@ -124,11 +123,11 @@ def process_candidate_rels(entry, summary,
         relations = get_rels(entry, entities, numbers, players, teams, cities)
         # make them named tuples
         relations = [RelationEntry(*rel) for rel in relations]
-        
+
         if len(relations) > 0:
             candidate_relations.append(
                 CandidateRelations(Tokens=tokens, Relations=relations))
-    
+
     return candidate_relations
 
 
@@ -137,7 +136,7 @@ def tokens_padding(tokens, max_length, pad_token="PAD"):
     pad_length = max_length - tokens_len
     if pad_length < 0:
         raise ValueError("Pad Length < 0: ", tokens)
-        
+
     tokens.extend([pad_token for _ in range(pad_length)])
     return tokens, tokens_len
 
@@ -167,10 +166,10 @@ def process_multilabeled_data(candidate_relation,
     token_ids_list = []
     token_lens_list = []
     label_ids_list = []
-    tokens = candidate_relation.Tokens
+    tokens = copy.deepcopy(candidate_relation.Tokens)
     padded_tokens, tokens_len = tokens_padding(tokens, tokens_max_length)
-    token_ids = map(token_look_up_fn, padded_tokens)
-    for entnum_pair, labels in unique_relations.iteritems():
+    token_ids = list(map(token_look_up_fn, padded_tokens))
+    for entnum_pair, labels in unique_relations.items():
 
         (entity, number) = entnum_pair
         if not isinstance(entity, EntityEntry):
@@ -181,10 +180,9 @@ def process_multilabeled_data(candidate_relation,
         token_ids_list.append(token_ids)
         token_lens_list.append(tokens_len)
 
-        label_ids = map(label_look_up_fn, labels)
+        label_ids = list(map(label_look_up_fn, labels))
         label_ids_list.append(label_ids)
 
-        
         entity_dist = [time_idx - entity.WindowLeft
                        if time_idx < entity.WindowLeft
                        else time_idx - entity.WindowRight + 1
@@ -199,8 +197,7 @@ def process_multilabeled_data(candidate_relation,
 
         entity_dists.append(entity_dist)
         number_dists.append(number_dist)
-        
-        
+
     return (token_ids_list, token_lens_list,
             entity_dists, number_dists, label_ids_list)
 
@@ -226,6 +223,43 @@ def append_labelnums(all_label_ids_list, pad_id=-1):
     return new_label_ids_list
 
 
+def collect_all_features(extracted_features, word_vocab, label_vocab):
+    all_token_ids_list = []
+    all_token_lens_list = []
+    all_entity_dists = []
+    all_number_dists = []
+    all_label_ids_list = []
+    # for training set
+    max_len = max([len(cand_rels.Tokens)
+        for cand_rels in extracted_features])
+    for cand_rels in extracted_features:
+        (token_ids_list,
+         token_lens_list,
+         entity_dists,
+         number_dists,
+         label_ids_list) = process_multilabeled_data(
+            candidate_relation=cand_rels,
+            tokens_max_length=max_len,
+            token_look_up_fn=lambda token: (
+                -1 if token == "PAD"
+                else word_vocab.word_to_id(token)),
+            label_look_up_fn=label_vocab.word_to_id)
+
+        all_token_ids_list += token_ids_list
+        all_token_lens_list += token_lens_list
+        all_entity_dists += entity_dists
+        all_number_dists += number_dists
+        all_label_ids_list += label_ids_list
+
+    new_label_ids_list = append_labelnums(all_label_ids_list)
+
+    return (all_token_ids_list,
+            all_token_lens_list,
+            all_entity_dists,
+            all_number_dists,
+            new_label_ids_list)
+
+
 def prepare_generated_data(train_json_file,
                            eval_json_file,
                            gen_file,
@@ -233,7 +267,7 @@ def prepare_generated_data(train_json_file,
                            vocabulary=None,
                            token_dict=None,
                            label_dict=None):
-    
+
     # Step 1: extract all the entities etc from train data
     all_entities, players, teams, cities = extract_entities_from_json(
         train_json_file, lower=False)
@@ -257,7 +291,6 @@ def prepare_generated_data(train_json_file,
             players=players, teams=teams, cities=cities)
         candidate_relations += (candidate_relation)
         sent_reset_indices.add(len(candidate_relations))
-
 
     # Step 3 process multi-labels and padding
     if vocabulary is not None:
@@ -291,7 +324,6 @@ def prepare_generated_data(train_json_file,
         # only used in debugging mode
         token_look_up_fn = lambda word: word
         label_look_up_fn = lambda label: label
-
 
     max_len = max((len(cr[0]) for cr in candidate_relations))
     all_token_ids_list = []
@@ -339,10 +371,42 @@ def prepare_generated_data(train_json_file,
         h5fi["boxrestartidxs"] = np.array(  # 1-indexed in torch
             np.array(rel_reset_indices) + 1, dtype=int)
         h5fi.close()
-    
+
     return (all_token_ids_list,
             all_token_lens_list,
             all_entity_dists,
             all_number_dists,
             all_label_ids_list,
             rel_reset_indices)
+
+
+class Vocabulary(object):
+    """Vocabulary class for an image-to-text model."""
+
+    def __init__(self,
+                 reverse_vocab,
+                 unk_word="UNK"):
+        """Initializes the vocabulary"""
+        if unk_word not in reverse_vocab:
+            reverse_vocab.append(unk_word)
+        vocab = dict([(x, y) for (y, x) in enumerate(reverse_vocab)])
+
+        print("Created vocabulary with %d words" % len(vocab))
+
+        self.vocab = vocab  # vocab[word] = id
+        self.reverse_vocab = reverse_vocab  # reverse_vocab[id] = word
+        self.unk_id = vocab[unk_word]
+
+    def word_to_id(self, word):
+        """Returns the integer word id of a word string."""
+        if word in self.vocab:
+            return self.vocab[word]
+        else:
+            return self.unk_id
+
+    def id_to_word(self, word_id):
+        """Returns the word string of an integer word id."""
+        if word_id >= len(self.reverse_vocab):
+            return self.reverse_vocab[self.unk_id]
+        else:
+            return self.reverse_vocab[word_id]

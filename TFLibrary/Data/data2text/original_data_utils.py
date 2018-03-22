@@ -68,7 +68,7 @@ def deterministic_resolve(pron, players, teams, cities, curr_ents, prev_ents, ma
     # we'll just take closest compatible one.
     # first look in current sentence; if there's an antecedent here return None, since
     # we'll catch it anyway
-    for j in xrange(len(curr_ents)-1, -1, -1):
+    for j in range(len(curr_ents)-1, -1, -1):
         if pron in singular_prons and curr_ents[j][2] in players:
             return None
         elif pron in plural_prons and curr_ents[j][2] in teams:
@@ -78,8 +78,8 @@ def deterministic_resolve(pron, players, teams, cities, curr_ents, prev_ents, ma
 
     # then look in previous max_back sentences
     if len(prev_ents) > 0:
-        for i in xrange(len(prev_ents)-1, len(prev_ents)-1-max_back, -1):
-            for j in xrange(len(prev_ents[i])-1, -1, -1):
+        for i in range(len(prev_ents)-1, len(prev_ents)-1-max_back, -1):
+            for j in range(len(prev_ents[i])-1, -1, -1):
                 if pron in singular_prons and prev_ents[i][j][2] in players:
                     return prev_ents[i][j]
                 elif pron in plural_prons and prev_ents[i][j][2] in teams:
@@ -294,9 +294,9 @@ def append_to_data(tup, sents, lens, entdists, numdists, labels, vocab, labeldic
         ent, num, label, idthing = rel
         sents.append(sent)
         lens.append(sentlen)
-        ent_dists = [j-ent[0] if j < ent[0] else j - ent[1] + 1 if j >= ent[1] else 0 for j in xrange(max_len)]
+        ent_dists = [j-ent[0] if j < ent[0] else j - ent[1] + 1 if j >= ent[1] else 0 for j in range(max_len)]
         entdists.append(ent_dists)
-        num_dists = [j-num[0] if j < num[0] else j - num[1] + 1 if j >= num[1] else 0 for j in xrange(max_len)]
+        num_dists = [j-num[0] if j < num[0] else j - num[1] + 1 if j >= num[1] else 0 for j in range(max_len)]
         numdists.append(num_dists)
         labels.append(labeldict[label])
 
@@ -320,9 +320,9 @@ def append_multilabeled_data(tup, sents, lens, entdists, numdists, labels, vocab
         ent, num = rel
         sents.append(sent)
         lens.append(sentlen)
-        ent_dists = [j-ent[0] if j < ent[0] else j - ent[1] + 1 if j >= ent[1] else 0 for j in xrange(max_len)]
+        ent_dists = [j-ent[0] if j < ent[0] else j - ent[1] + 1 if j >= ent[1] else 0 for j in range(max_len)]
         entdists.append(ent_dists)
-        num_dists = [j-num[0] if j < num[0] else j - num[1] + 1 if j >= num[1] else 0 for j in xrange(max_len)]
+        num_dists = [j-num[0] if j < num[0] else j - num[1] + 1 if j >= num[1] else 0 for j in range(max_len)]
         numdists.append(num_dists)
         labels.append([labeldict[label] for label in label_list])
 
@@ -435,11 +435,11 @@ def save_full_sent_data(outfile, path="../boxscore-data/rotowire", multilabel_tr
     revvocab = dict(((v,k) for k,v in vocab.items()))
     revlabels = dict(((v,k) for k,v in labeldict.items()))
     with codecs.open(outfile.split('.')[0] + ".dict", "w+", "utf-8") as f:
-        for i in xrange(1, len(revvocab)+1):
+        for i in range(1, len(revvocab)+1):
             f.write("%s %d \n" % (revvocab[i], i))
 
     with codecs.open(outfile.split('.')[0] + ".labels", "w+", "utf-8") as f:
-        for i in xrange(1, len(revlabels)+1):
+        for i in range(1, len(revlabels)+1):
             f.write("%s %d \n" % (revlabels[i], i))
 
 
@@ -524,7 +524,7 @@ def get_player_idxs(entry):
         nplayers += 1
 
     num_home, num_vis = 0, 0
-    for i in xrange(nplayers):
+    for i in range(nplayers):
         player_city = entry["box_score"]["TEAM_CITY"][str(i)]
         if player_city == entry["home_city"]:
             if len(home_players) < NUM_PLAYERS:
@@ -540,12 +540,12 @@ def box_preproc2(trdata):
     """
     just gets src for now
     """
-    srcs = [[] for i in xrange(2*NUM_PLAYERS+2)]
+    srcs = [[] for i in range(2*NUM_PLAYERS+2)]
 
     for entry in trdata:
         home_players, vis_players = get_player_idxs(entry)
         for ii, player_list in enumerate([home_players, vis_players]):
-            for j in xrange(NUM_PLAYERS):
+            for j in range(NUM_PLAYERS):
                 src_j = []
                 player_key = player_list[j] if j < len(player_list) else None
                 for k, key in enumerate(bs_keys):
@@ -555,7 +555,7 @@ def box_preproc2(trdata):
                 srcs[ii*NUM_PLAYERS + j].append(src_j)
 
         home_src, vis_src = [], []
-        for k in xrange(len(bs_keys) - len(ls_keys)):
+        for k in range(len(bs_keys) - len(ls_keys)):
             home_src.append("PAD")
             vis_src.append("PAD")
 
@@ -574,9 +574,9 @@ def linearized_preproc(srcs):
     ntrain-length list of concatenated rows
     """
     lsrcs = []
-    for i in xrange(len(srcs[0])):
+    for i in range(len(srcs[0])):
         src_i = []
-        for j in xrange(len(srcs)):
+        for j in range(len(srcs)):
             src_i.extend(srcs[j][i][1:]) # b/c in lua we ignore first thing
         lsrcs.append(src_i)
     return lsrcs
@@ -585,7 +585,7 @@ def fix_target_idx(summ, assumed_idx, word, neighborhood=5):
     """
     tokenization can mess stuff up, so look around
     """
-    for i in xrange(1, neighborhood+1):
+    for i in range(1, neighborhood+1):
         if assumed_idx + i < len(summ) and summ[assumed_idx + i] == word:
             return assumed_idx + i
         elif assumed_idx - i >= 0 and assumed_idx - i < len(summ) and summ[assumed_idx - i] == word:
@@ -752,7 +752,7 @@ def save_coref_task_data(outfile, inp_file="full_newnba_prepdata2.json"):
         for i, entry in enumerate(dataset):
             summ = entry["summary"]
             ents = extract_entities(summ, all_ents, prons)
-            for j in xrange(1, len(ents)):
+            for j in range(1, len(ents)):
                 # just get all the words from previous mention till this one starts
                 prev_start, prev_end, prev_str, _ = ents[j-1]
                 curr_start, curr_end, curr_str, curr_pron = ents[j]
@@ -808,11 +808,11 @@ def save_coref_task_data(outfile, inp_file="full_newnba_prepdata2.json"):
     revvocab = dict(((v,k) for k,v in vocab.items()))
     revlabels = dict(((v,k) for k,v in labeldict.items()))
     with codecs.open(outfile.split('.')[0] + ".dict", "w+", "utf-8") as f:
-        for i in xrange(1, len(revvocab)+1):
+        for i in range(1, len(revvocab)+1):
             f.write("%s %d \n" % (revvocab[i], i))
 
     with codecs.open(outfile.split('.')[0] + ".labels", "w+", "utf-8") as f:
-        for i in xrange(1, len(revlabels)+1):
+        for i in range(1, len(revlabels)+1):
             f.write("%s %d \n" % (revlabels[i], i))
 
 

@@ -56,6 +56,14 @@ def check_set_equality(set_A, set_B):
     print("PASSED")
 
 
+def check_dict_equality(dict_A, dict_B):
+    if not isinstance(dict_A, dict):
+        raise TypeError("dict_A is not a dict")
+    if not isinstance(dict_B, dict):
+        raise TypeError("dict_B is not a dict")
+
+
+
 def tensor_is_zero(sess, tensor, msg=None):
     is_zero = (sess.run(tensor) == 0).all()
     if msg:
