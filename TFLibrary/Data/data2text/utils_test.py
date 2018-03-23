@@ -14,7 +14,7 @@ from TFLibrary.Data.data2text import utils
 from TFLibrary.Data.data2text import original_data_utils as orig_utils
 
 
-def test(json_file):
+def test_components():
     # ===========================================================
     # set_up
     # ===========================================================
