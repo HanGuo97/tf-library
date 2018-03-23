@@ -923,26 +923,27 @@ def save_coref_task_data(outfile, inp_file="full_newnba_prepdata2.json"):
 #     save_full_sent_data(train_output_fi, multilabel_train=multilabel_train)
 
 
-# parser = argparse.ArgumentParser(description='Utility Functions')
-# parser.add_argument('-input_path', type=str, default="",
-#                     help="path to input")
-# parser.add_argument('-output_fi', type=str, default="",
-#                     help="desired path to output file")
-# parser.add_argument('-gen_fi', type=str, default="",
-#                     help="path to file containing generated summaries")
-# parser.add_argument('-dict_pfx', type=str, default="roto-ie",
-#                     help="prefix of .dict and .labels files")
-# parser.add_argument('-mode', type=str, default='ptrs',
-#                     choices=['ptrs', 'make_ie_data', 'prep_gen_data'],
-#                     help="what utility function to run")
-# parser.add_argument('-test', action='store_true', help='use test data')
-#
-# args = parser.parse_args()
-#
-# if args.mode == 'ptrs':
-#     make_pointerfi(args.output_fi, inp_file=args.input_path)
-# elif args.mode == 'make_ie_data':
-#     save_full_sent_data(args.output_fi, path=args.input_path, multilabel_train=True)
-# elif args.mode == 'prep_gen_data':
-#     prep_generated_data(args.gen_fi, args.dict_pfx, args.output_fi, path=args.input_path,
-#                         test=args.test)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Utility Functions')
+    parser.add_argument('-input_path', type=str, default="",
+                     help="path to input")
+    parser.add_argument('-output_fi', type=str, default="",
+                     help="desired path to output file")
+    parser.add_argument('-gen_fi', type=str, default="",
+                     help="path to file containing generated summaries")
+    parser.add_argument('-dict_pfx', type=str, default="roto-ie",
+                     help="prefix of .dict and .labels files")
+    parser.add_argument('-mode', type=str, default='ptrs',
+                     choices=['ptrs', 'make_ie_data', 'prep_gen_data'],
+                     help="what utility function to run")
+    parser.add_argument('-test', action='store_true', help='use test data')
+
+    args = parser.parse_args()
+
+    if args.mode == 'ptrs':
+        make_pointerfi(args.output_fi, inp_file=args.input_path)
+    elif args.mode == 'make_ie_data':
+        save_full_sent_data(args.output_fi, path=args.input_path, multilabel_train=True)
+    elif args.mode == 'prep_gen_data':
+        prep_generated_data(args.gen_fi, args.dict_pfx, args.output_fi, path=args.input_path,
+                        test=args.test)
