@@ -7,21 +7,26 @@ import json
 import copy
 import codecs
 import numpy as np
+from nltk import sent_tokenize
 from collections import namedtuple
 from collections import defaultdict
-from nltk import sent_tokenize
+
 from TFLibrary.Data.data2text.original_data_utils import prons as PRONS
 from TFLibrary.Data.data2text.original_data_utils import extract_numbers, extract_entities, get_rels
 
 
-EntityEntry = namedtuple("EntityEntry",
-                         ("WindowLeft", "WindowRight", "Token", "IsPronoun"))
-NumberEntry = namedtuple("NumberEntry",
-                         ("WindowLeft", "WindowRight", "Token"))
-RelationEntry = namedtuple("RelationEntry",
-                           ("Entity", "Number", "Label", "PlayerID_or_TeamIsHome"))
-CandidateRelations = namedtuple("CandidateRelations",
-                                ("Tokens", "Relations"))
+EntityEntry = namedtuple(
+    "EntityEntry",
+    ("WindowLeft", "WindowRight", "Token", "IsPronoun"))
+NumberEntry = namedtuple(
+    "NumberEntry",
+    ("WindowLeft", "WindowRight", "Token"))
+RelationEntry = namedtuple(
+    "RelationEntry",
+    ("Entity", "Number", "Label", "PlayerID_or_TeamIsHome"))
+CandidateRelations = namedtuple(
+    "CandidateRelations",
+    ("Tokens", "Relations"))
 
 
 def _flatten(L):
@@ -260,6 +265,55 @@ def collect_all_features(extracted_features, word_vocab, label_vocab):
             new_label_ids_list)
 
 
+def tile_dataset(token_ids_list, token_lens_list,
+                 entity_dists, number_dists, label_ids_list):
+    """
+    Original label_ids_list contains multiple ground-truth
+    labels for a given input pairs. Here we tile datasets
+    so that each input-output pair has single target
+    """
+    if not token_ids_list.shape[0] == entity_dists.shape[0]:
+        raise AssertionError
+    if not token_ids_list.shape[0] == token_lens_list.shape[0]:
+        raise AssertionError
+    if not token_ids_list.shape[0] == number_dists.shape[0]:
+        raise AssertionError
+    if not token_ids_list.shape[0] == label_ids_list.shape[0]:
+        raise AssertionError
+    
+    tiled_tokens = []
+    tiled_token_lens = []
+    tiled_entity_dists = []
+    tiled_number_dists = []
+    tiled_label_ids = []
+    for row_idx in range(token_ids_list.shape[0]):
+        # the last number in label_ids_list
+        # tells the number of labels with the same inputs
+        token_ids = token_ids_list[row_idx, :]
+        token_lens = token_lens_list[row_idx]
+        entity_dist = entity_dists[row_idx, :]
+        number_dist = number_dists[row_idx, :]
+        label_ids = label_ids_list[row_idx, :]
+        
+        for label_idx in range(label_ids[-1]):
+            tiled_tokens.append(token_ids)
+            tiled_token_lens.append(token_lens)
+            tiled_entity_dists.append(entity_dist)
+            tiled_number_dists.append(number_dist)
+            tiled_label_ids.append(label_ids[label_idx])
+    
+    return (tiled_tokens,
+            tiled_token_lens,
+            tiled_entity_dists,
+            tiled_number_dists,
+            tiled_label_ids)
+
+
+
+
+
+
+
 def prepare_generated_data(train_json_file,
                            eval_json_file,
                            gen_file,
@@ -378,35 +432,3 @@ def prepare_generated_data(train_json_file,
             all_number_dists,
             all_label_ids_list,
             rel_reset_indices)
-
-
-class Vocabulary(object):
-    """Vocabulary class for an image-to-text model."""
-
-    def __init__(self,
-                 reverse_vocab,
-                 unk_word="UNK"):
-        """Initializes the vocabulary"""
-        if unk_word not in reverse_vocab:
-            reverse_vocab.append(unk_word)
-        vocab = dict([(x, y) for (y, x) in enumerate(reverse_vocab)])
-
-        print("Created vocabulary with %d words" % len(vocab))
-
-        self.vocab = vocab  # vocab[word] = id
-        self.reverse_vocab = reverse_vocab  # reverse_vocab[id] = word
-        self.unk_id = vocab[unk_word]
-
-    def word_to_id(self, word):
-        """Returns the integer word id of a word string."""
-        if word in self.vocab:
-            return self.vocab[word]
-        else:
-            return self.unk_id
-
-    def id_to_word(self, word_id):
-        """Returns the word string of an integer word id."""
-        if word_id >= len(self.reverse_vocab):
-            return self.reverse_vocab[self.unk_id]
-        else:
-            return self.reverse_vocab[word_id]

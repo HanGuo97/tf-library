@@ -1,6 +1,17 @@
-from collections import deque
 import random
+import pickle
 import numpy as np
+from collections import deque
+
+
+def save_object(obj, filename):
+    with open(filename, 'wb') as output:  # Overwrites any existing file.
+        pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
+
+
+
+
+
 
 
 class ReplayBuffer(object):
@@ -77,4 +88,3 @@ class OrnsteinUhlenbeckActionNoise(object):
 
     def __repr__(self):
         return 'OrnsteinUhlenbeckActionNoise(mu={}, sigma={})'.format(self.mu, self.sigma)
-

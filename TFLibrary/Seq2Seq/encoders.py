@@ -8,65 +8,70 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import rnn as rnn_ops
 from tensorflow.python.framework import dtypes
 
-from TFLibrary.Seq2Seq import base_model
+from TFLibrary.Seq2Seq import base_models
 from TFLibrary.Seq2Seq import rnn_cell_utils
+from TFLibrary.utils import tensorflow_utils
 
 
-class LstmEncoder(base_model.BaseEncoder):
+class LstmEncoder(base_models.BaseEncoder):
     """Unidirectional LSTM Encoder."""
 
     def __init__(self,
-                 hparams,
+                 unit_type,
+                 num_units,
+                 num_layers=1,
+                 dropout_rate=None,
+                 num_residual_layers=0,
                  scope="encoder",
-                 is_training=True,
+                 is_training=True,  # only for dropout
                  bidirectional=True):
-
-        if not isinstance(hparams, base_model.EncoderHParams):
-            raise TypeError("Expected hparams to be EncoderHParams")
         
-        self._hparams = hparams
         self._encoder_scope = scope
         self._is_training = is_training
         self._bidirectional = bidirectional
-
+        
+        self._unit_type = unit_type
+        self._num_units = num_units
+        self._num_layers = num_layers
+        self._dropout_rate = dropout_rate
+        self._num_residual_layers = num_residual_layers
 
     @property
     def output_size(self):
         return self._cell.output_size
 
     def build(self):
-        hps = self._hparams
         mode = "train" if self._is_training else "inference"
 
         if self._bidirectional:
             self._fw_cell = rnn_cell_utils.create_rnn_cell(
-                unit_type=hps.unit_type,
-                num_units=hps.num_units,
-                num_layers=hps.num_layers,
+                unit_type=self._unit_type,
+                num_units=self._num_units,
+                num_layers=self._num_layers,
                 mode=mode,
-                dropout=hps.dropout_rate,
-                num_residual_layers=hps.num_residual_layers,
+                dropout=self._dropout_rate,
+                num_residual_layers=self._num_residual_layers,
                 # use default cell creator
                 single_cell_fn=None)
 
             self._bw_cell = rnn_cell_utils.create_rnn_cell(
-                unit_type=hps.unit_type,
-                num_units=hps.num_units,
-                num_layers=hps.num_layers,
+                unit_type=self._unit_type,
+                num_units=self._num_units,
+                num_layers=self._num_layers,
                 mode=mode,
-                dropout=hps.dropout_rate,
-                num_residual_layers=hps.num_residual_layers,
+                dropout=self._dropout_rate,
+                num_residual_layers=self._num_residual_layers,
                 # use default cell creator
                 single_cell_fn=None)
 
         else:
             self._cell = rnn_cell_utils.create_rnn_cell(
-                unit_type=hps.unit_type,
-                num_units=hps.num_units,
-                num_layers=hps.num_layers,
+                unit_type=self._unit_type,
+                num_units=self._num_units,
+                num_layers=self._num_layers,
                 mode=mode,
-                dropout=hps.dropout_rate,
-                num_residual_layers=hps.num_residual_layers,
+                dropout=self._dropout_rate,
+                num_residual_layers=self._num_residual_layers,
                 # use default cell creator
                 single_cell_fn=None)
 
@@ -96,3 +101,27 @@ class LstmEncoder(base_model.BaseEncoder):
                 scope=self._encoder_scope)
         
         return outputs, state
+
+
+class TempConvEncoder(base_models.BaseEncoder):
+    def __init__(self,
+                 widths,
+                 num_units,
+                 scope="encoder",
+                 is_training=True,
+                 bidirectional=True):
+
+        self._widths = widths
+        self._num_units = num_units
+        self._encoder_scope = scope
+        self._is_training = is_training
+
+    @property
+    def output_size(self):
+        return self._hps.num_units
+
+    def build(self):
+        pass
+
+    def encode(self, inputs):
+        pass

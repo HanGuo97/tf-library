@@ -11,3 +11,7 @@ def gradient_clip(gradients, max_gradient_norm):
                           tf.global_norm(clipped_gradients)))
 
     return clipped_gradients, gradient_norm_summary, gradient_norm
+
+
+def untested_warning():
+    tf.logging.warning("THIS IS NOT TESTED")
