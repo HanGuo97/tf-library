@@ -32,6 +32,9 @@ number_words = set(["one", "two", "three", "four", "five", "six", "seven", "eigh
                     "sixty", "seventy", "eighty", "ninety", "hundred", "thousand"])
 
 
+print("originall_data_utils ONLY SUPPORTS PYTHON2")
+
+
 def get_ents(dat):
     players = set()
     teams = set()
