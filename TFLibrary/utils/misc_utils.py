@@ -1,3 +1,4 @@
+import os
 import random
 import pickle
 import numpy as np
@@ -9,9 +10,13 @@ def save_object(obj, filename):
         pickle.dump(obj, output, pickle.HIGHEST_PROTOCOL)
 
 
-
-
-
+def maybe_delete_file(file_dir, check_exists=False):
+    if os.path.exists(file_dir):
+        os.remove(file_dir)
+        print("File %s is deleted" % file_dir)
+    
+    elif check_exists:
+        raise ValueError("File %s does not exist" % file_dir)
 
 
 class ReplayBuffer(object):

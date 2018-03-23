@@ -1,6 +1,6 @@
 """
 Original implementation with some fixes to be compatible
-between python 2 and 3
+between python 2 and 3, and for my test
 """
 
 import codecs
@@ -362,7 +362,12 @@ def append_labelnums(labels):
 # for full sentence IE training
 
 
-def save_full_sent_data(outfile, path="../boxscore-data/rotowire", multilabel_train=False, nonedenom=0):
+def save_full_sent_data(outfile,
+                        path="../boxscore-data/rotowire",
+                        multilabel_train=False,
+                        nonedenom=0,
+                        replacement_vocab=None,
+                        replacement_labeldict=None):
     datasets = get_datasets(path)
     # make vocab and get labels
     word_counter = Counter()
@@ -375,6 +380,11 @@ def save_full_sent_data(outfile, path="../boxscore-data/rotowire", multilabel_tr
     labelset = set()
     [labelset.update([rel[2] for rel in tup[1]]) for tup in datasets[0]]
     labeldict = dict(((label, i + 1) for i, label in enumerate(labelset)))
+
+    ############ Changed
+    vocab = vocab if not replacement_vocab else replacement_vocab
+    labeldict = labeldict if not replacement_labeldict else replacement_labeldict
+    ####################
 
     # save stuff
     trsents, trlens, trentdists, trnumdists, trlabels = [], [], [], [], []
@@ -468,15 +478,16 @@ def save_full_sent_data(outfile, path="../boxscore-data/rotowire", multilabel_tr
     # h5fi.close()
 
     # write dicts
-    revvocab = dict(((v, k) for k, v in vocab.items()))
-    revlabels = dict(((v, k) for k, v in labeldict.items()))
-    with codecs.open(outfile.split('.')[0] + ".dict", "w+", "utf-8") as f:
-        for i in range(1, len(revvocab) + 1):
-            f.write("%s %d \n" % (revvocab[i], i))
+    if (replacement_vocab is None) and (replacement_labeldict is None):
+        revvocab = dict(((v, k) for k, v in vocab.items()))
+        revlabels = dict(((v, k) for k, v in labeldict.items()))
+        with codecs.open(outfile.split('.')[0] + ".dict", "w+", "utf-8") as f:
+            for i in range(1, len(revvocab) + 1):
+                f.write("%s %d \n" % (revvocab[i], i))
 
-    with codecs.open(outfile.split('.')[0] + ".labels", "w+", "utf-8") as f:
-        for i in range(1, len(revlabels) + 1):
-            f.write("%s %d \n" % (revlabels[i], i))
+        with codecs.open(outfile.split('.')[0] + ".labels", "w+", "utf-8") as f:
+            for i in range(1, len(revlabels) + 1):
+                f.write("%s %d \n" % (revlabels[i], i))
 
 
 def prep_generated_data(genfile, dict_pfx, outfile, path="../boxscore-data/rotowire", test=False):
