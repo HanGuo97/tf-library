@@ -1,17 +1,19 @@
 """
 https://github.com/tensorflow/tensorflow/blob/r1.5/tensorflow/contrib/seq2seq/python/ops/attention_wrapper.py
 """
-from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import array_ops
 
 
 def _compute_attention(attention_mechanism,
                        cell_output,
+                       attention_state,
                        attention_layer):
-    """Computes the attention and alignments for given attention_mechanism.
-    But additionally outputs the context vector"""
-
-    alignments, _ = attention_mechanism(cell_output)
+    """Computes the attention and alignments
+       for a given attention_mechanism.
+    """
+    alignments, next_attention_state = attention_mechanism(
+        cell_output, state=attention_state)
 
     # Reshape from [batch_size, memory_time] to [batch_size, 1, memory_time]
     expanded_alignments = array_ops.expand_dims(alignments, 1)
@@ -33,4 +35,4 @@ def _compute_attention(attention_mechanism,
     else:
         attention = context
 
-    return attention, alignments, context
+    return attention, alignments, next_attention_state

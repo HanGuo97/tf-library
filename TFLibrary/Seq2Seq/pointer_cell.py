@@ -7,7 +7,6 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import tensor_array_ops
-from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import rnn_cell_impl
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import dtypes
@@ -17,19 +16,12 @@ from tensorflow.python.layers import core as layers_core
 from tensorflow.python.layers import core as core_layers
 from tensorflow.contrib.seq2seq import attention_wrapper as seq2seq_ops
 
-
+import numpy as np
 from collections import namedtuple
 from TFLibrary.Seq2Seq import attention_utils
 from TFLibrary.Seq2Seq import rnn_cell_utils
 
-ZERO_TOLERANCE = 1e-6
 _zero_state_tensors = rnn_cell_impl._zero_state_tensors
-
-
-def _is_zero_matrix(X):
-    # taking into account of small numerical errors
-    mat_sum = math_ops.reduce_sum(X)
-    return math_ops.less(mat_sum, ZERO_TOLERANCE)
 
 
 def masked_attention(score, enc_padding_mask):
@@ -42,50 +34,6 @@ def masked_attention(score, enc_padding_mask):
     masked_sums = math_ops.reduce_sum(attn_dist, axis=1)
     # re-normalize
     return attn_dist / array_ops.reshape(masked_sums, [-1, 1])
-
-
-def _compute_attention(cell_output, coverage=None):
-    raise NotImplementedError("Not Tested")
-    # Pass the decoder state through a linear layer
-    # (this is W_s s_t + b_attn in the paper)
-    # shape (batch_size, attention_vec_size)
-    processed_query = control_flow_ops.cond(
-        # i.e. None or not set
-        _is_zero_matrix(coverage),
-        # v^T tanh(W_h h_i + W_s s_t + b_attn)
-        true_fn=lambda: query_kernel(cell_output),
-        # v^T tanh(W_h h_i + W_s s_t + w_c c_i^t + b_attn)
-        false_fn=lambda: (query_kernel(cell_output) +
-                          coverage_kernel(coverage)))
-
-    score = attention_utils._bahdanau_score(
-        processed_query=processed_query,
-        keys=processed_memory,
-        normalize=False)
-
-    # Calculate attention distribution
-    alignments = masked_attention(score)
-
-    if use_coverage:
-        # update coverage
-        coverage = coverage + alignments
-
-    # Reshape from [batch_size, memory_time]
-    # to [batch_size, 1, memory_time]
-    expanded_alignments = array_ops.expand_dims(alignments, 1)
-    # Context is the inner product of alignments and values along the
-    # memory time dimension.
-    # alignments shape is
-    #   [batch_size, 1, memory_time]
-    # attention_mechanism.values shape is
-    #   [batch_size, memory_time, memory_size]
-    # the batched matmul is over memory_time, so the output shape is
-    #   [batch_size, 1, memory_size].
-    # we then squeeze out the singleton dim.
-    context = math_ops.matmul(expanded_alignments, memory)
-    context = array_ops.squeeze(context, [1])
-
-    return context, alignments, coverage
 
 
 def _calc_final_dist(vocab_dist, attn_dist, p_gen,
@@ -182,9 +130,9 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
         # if initial_state_attention:
         #     raise NotImplementedError
         if coverage:
-            # there is a problem in coverage, see Line 216 - 221 in original
-            # attention_decoder
-            raise NotImplementedError("Not Supported")
+            print("there is a problem in coverage,"
+                  "see Line 216 - 221 in original"
+                  "attention_decoder")
 
         if initial_cell_state:
             raise NotImplementedError("Not Supported")
@@ -228,6 +176,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
         self._output_attention = output_attention
         self._alignment_history = alignment_history
 
+        self._coverage = coverage
         self._pointer_scope = pointer_scope
         self._attention_scope = attention_scope
 
@@ -380,13 +329,39 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
         # Step 2: Compute attention and write to history
         with variable_scope.variable_scope(self._attention_scope, "Attention"):
 
+            # attention_utils._compute_attention calls the function
+            # attention_mechanism.__call__(self, query, state)
+            # where state is not used.
+            # In the normal attention setting, we have
+            #   e = v^T tanh (W_h x h + W_s x s + b)
+            # where h is the query and s is the memory
+            # In the coverage-attention setting, we have
+            #   e = v^T tanh (W_h x h + W_s x s + + W_c x c b)
+            # where c is the coverage
+            # A simple reparameterization can be
+            #   e = v^T tanh (W_h' x h' + W_s x s + b)
+            # where h' = [h;c], and this makes implementation cleaner
+            if self._coverage:
+                attention_query = array_ops.concat(
+                    [cell_output, state.coverage], axis=-1)
+            else:
+                # copy coverage to next time step
+                coverage = state.coverage
+                attention_query = cell_output
+
+            # calculate attentions
             (attention, alignments, context) = (
                 attention_utils._compute_attention(
                     attention_mechanism=self._attention_mechanism,
-                    cell_output=cell_output,
+                    cell_output=attention_query,
                     attention_state=None,
                     attention_layer=(self._attention_layer
                         if self._attention_layer else None)))
+
+            if self._coverage:
+                # coverage = sum of alignments
+                # up until previous time step
+                coverage = state.coverage + alignments
 
 
         # Step 3: Compute pointer and coverage and write to histories
@@ -415,6 +390,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
         time = state.time
         alignment_history = state.alignment_history.write(
             time, alignments) if self._alignment_history else ()
+        coverages_history = state.coverages_history.write(time, coverage)
         p_gen_history = state.p_gen_history.write(time, p_gen)
         logits_history = state.logits_history.write(time, logits)
         vocab_dists_history = state.vocab_dists_history.write(time, vocab_dist)
@@ -431,13 +407,12 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
             alignment_history=alignment_history,
             # Pointer
             p_gen=p_gen,
-            coverage=state.coverage,
+            coverage=coverage,
             p_gen_history=p_gen_history,
+            coverages_history=coverages_history,
             logits_history=logits_history,
             vocab_dists_history=vocab_dists_history,
-            final_dists_history=final_dists_history,
-            # not used at now
-            coverages_history=state.coverages_history)
+            final_dists_history=final_dists_history)
 
         if self._output_attention:
             return attention, next_state
@@ -459,3 +434,16 @@ def unstack_and_transpose_histories(final_loop_state):
         final_loop_state.final_dists_history.stack(), perm=[1, 0, 2])
 
     return (alignments, p_gens, logits, vocab_dists, final_dists)
+
+
+def _unnecessary_test():
+    Wa = np.random.random([128, 128])
+    Wb = np.random.random([128, 128])
+    A = np.random.random([128])
+    B = np.random.random([128])
+
+    W = np.concatenate([Wa, Wb], axis=-1)
+    X = np.concatenate([A, B], axis=-1)
+
+    passed = (np.matmul(Wa, A) + np.matmul(Wb, B) - np.matmul(W, X)) < 1e-11
+    print("Passed: ", passed.all())
