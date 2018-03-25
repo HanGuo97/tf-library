@@ -81,7 +81,7 @@ def boltzmann_exploration(Q_values, temperature=1.0):
 class MultiArmedBanditSelector(object):
     def __init__(self,
                  num_actions,
-                 Q_initial,
+                 initial_weights,
                  update_method="average",
                  alpha=0.3,
                  initial_temperature=1.0,
@@ -91,7 +91,7 @@ class MultiArmedBanditSelector(object):
             raise ValueError("Unknown update_method ", update_method)
 
         self._Q_values = [
-            Q_Entry(Value=Q_initial, Count=1)
+            Q_Entry(Value=initial_weights, Count=1)
             for _ in range(num_actions)]
         self._num_actions = num_actions
         self._update_method = update_method
@@ -116,7 +116,7 @@ class MultiArmedBanditSelector(object):
                 if self._temperature_anneal_rate is not None else 1)
 
             chosen_action, Q_probs = boltzmann_exploration(
-                Q_values=np.asarray(self.expected_Q_values),
+                Q_values=np.asarray(self.arm_weights),
                 temperature=self._temperature * temperature_coef)
 
         elif self._update_method in ["exp3"]:
@@ -135,45 +135,45 @@ class MultiArmedBanditSelector(object):
 
         return chosen_action, Q_probs
 
-    def update_Q_values(self, new_Q_value, index):
+    def update(self, reward, chosen_arm):
         # uses sampling, set weights = 1
-        if not isinstance(index, int):
-            raise ValueError("index must be integers")
-        if not index < self._num_actions:
-            raise ValueError("index out of range")
+        if not isinstance(chosen_arm, int):
+            raise ValueError("chosen_arm must be integers")
+        if not chosen_arm < self._num_actions:
+            raise ValueError("chosen_arm out of range")
 
         if self._update_method == "average":
             new_Q, new_C = incremental_weighted_mean(
-                G=new_Q_value, W=1,
-                V=self._Q_values[index].Value,
-                C=self._Q_values[index].Count)
-            self._Q_values[index].Value = new_Q
-            self._Q_values[index].Count = new_C
+                G=reward, W=1,
+                V=self._Q_values[chosen_arm].Value,
+                C=self._Q_values[chosen_arm].Count)
+            self._Q_values[chosen_arm].Value = new_Q
+            self._Q_values[chosen_arm].Count = new_C
 
         elif self._update_method == "gradient_bandit":
             new_Q = gradient_bandit(
-                reward=new_Q_value,
+                reward=reward,
                 alpha=self._alpha,
-                old_Q=self._Q_values[index].Value)
-            self._Q_values[index].Value = new_Q
-            self._Q_values[index].Count += 1
+                old_Q=self._Q_values[chosen_arm].Value)
+            self._Q_values[chosen_arm].Value = new_Q
+            self._Q_values[chosen_arm].Count += 1
 
         elif self._update_method == "exp3":
             probs, new_weights = exp3.exp3_update(
-                sampled=index,
+                sampled=chosen_arm,
                 # non-sampled rewards will be cast to 0.
-                rewards=[new_Q_value for _ in range(self._num_actions)],
+                rewards=[reward for _ in range(self._num_actions)],
                 probs=[Q.Count for Q in self._Q_values],
                 weights=[Q.Value for Q in self._Q_values],
                 gamma=self._alpha)
 
-            for index in range(self._num_actions):
-                self._Q_values[index].Count = probs[index]
-                self._Q_values[index].Value = new_weights[index]
+            for chosen_arm in range(self._num_actions):
+                self._Q_values[chosen_arm].Count = probs[chosen_arm]
+                self._Q_values[chosen_arm].Value = new_weights[chosen_arm]
 
 
     @property
-    def expected_Q_values(self):
+    def arm_weights(self):
         return [Q.Value for Q in self._Q_values]
 
     def save(self, file_dir):

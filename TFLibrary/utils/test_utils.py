@@ -3,8 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from IPython.display import display
-from sklearn.decomposition import PCA
-from sklearn.metrics import mean_squared_error
+from tensorflow.python.framework.dtypes import DType as tf_dtype
 
 
 def create_scope(name):
@@ -13,12 +12,20 @@ def create_scope(name):
     return scope
 
 
+def is_tensorflow_dtype(dtype):
+    if isinstance(dtype, tf_dtype):
+        return True
+    return False
+
+
 def random_integers(low, high, shape, dtype=tf.int32):
     randint = np.random.randint(low=low, high=high, size=shape)
-    randint = tf.convert_to_tensor(randint, dtype=dtype)
+    if is_tensorflow_dtype(dtype):
+        randint = tf.convert_to_tensor(randint, dtype=dtype)
+
     return randint
     
-    
+
 def random_tensor(shape, *args, **kargs):
     return tf.random_normal(shape=shape, *args, **kargs)
 
