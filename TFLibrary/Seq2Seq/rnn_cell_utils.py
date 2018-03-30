@@ -128,7 +128,7 @@ def create_rnn_cell(unit_type,
 
 
 def get_last_layer_cell_state(cell_states):
-    if isinstance(cell_states, rnn_cell_impl):
+    if isinstance(cell_states, rnn_cell_impl.LSTMStateTuple):
         return cell_states
     else:
         return cell_states[-1]

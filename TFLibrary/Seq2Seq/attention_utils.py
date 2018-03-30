@@ -35,4 +35,4 @@ def _compute_attention(attention_mechanism,
     else:
         attention = context
 
-    return attention, alignments, next_attention_state
+    return attention, alignments, next_attention_state, context

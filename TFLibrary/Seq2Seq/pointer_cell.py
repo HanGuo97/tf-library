@@ -14,7 +14,7 @@ from tensorflow.python.framework import tensor_shape
 from tensorflow.python.layers import core as layers_core
 
 from tensorflow.python.layers import core as core_layers
-from tensorflow.contrib.seq2seq import attention_wrapper as seq2seq_ops
+from tensorflow.contrib.seq2seq import AttentionMechanism
 
 import numpy as np
 from collections import namedtuple
@@ -69,7 +69,7 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
     # to [[1], [2], ..., [N]]
     # and finally to the final shape
     enc_seq_len = array_ops.shape(enc_batch_extended_vocab)[1]
-    batch_nums = array_ops.range(0, limit=batch_size)
+    batch_nums = math_ops.range(0, limit=batch_size)
     batch_nums = array_ops.expand_dims(batch_nums, 1)
     batch_nums = array_ops.tile(batch_nums, [1, enc_seq_len])
 
@@ -141,7 +141,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
             raise TypeError(
                 "cell must be an RNNCell, saw type: %s" % type(cell).__name__)
 
-        if not isinstance(attention_mechanism, seq2seq_ops.AttentionMechanism):
+        if not isinstance(attention_mechanism, AttentionMechanism):
             raise TypeError(
                 "attention_mechanism must be an AttentionMechanism or list of "
                 "multiple AttentionMechanism instances, saw type: %s"
@@ -304,10 +304,10 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
                 alignments=zero_alignments,
                 alignment_history=zero_alignment_history,
                 # Pointers
-                p_gen=array_ops.zeros([1], dtype=dtypes.int32),
+                p_gen=array_ops.zeros([batch_size, 1], dtype=dtypes.float32),
                 coverage=zero_coverage,
                 p_gen_history=zero_p_gen_history,
-                coverages_history=zero_coverage_history,
+                coverage_history=zero_coverage_history,
                 logits_history=zero_logits_history,
                 vocab_dists_history=zero_vocab_dists_history,
                 final_dists_history=zero_final_dists_history)
@@ -350,7 +350,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
                 attention_query = cell_output
 
             # calculate attentions
-            (attention, alignments, context) = (
+            (attention, alignments, _, context) = (
                 attention_utils._compute_attention(
                     attention_mechanism=self._attention_mechanism,
                     cell_output=attention_query,
@@ -390,7 +390,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
         time = state.time
         alignment_history = state.alignment_history.write(
             time, alignments) if self._alignment_history else ()
-        coverages_history = state.coverages_history.write(time, coverage)
+        coverage_history = state.coverage_history.write(time, coverage)
         p_gen_history = state.p_gen_history.write(time, p_gen)
         logits_history = state.logits_history.write(time, logits)
         vocab_dists_history = state.vocab_dists_history.write(time, vocab_dist)
@@ -409,7 +409,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
             p_gen=p_gen,
             coverage=coverage,
             p_gen_history=p_gen_history,
-            coverages_history=coverages_history,
+            coverage_history=coverage_history,
             logits_history=logits_history,
             vocab_dists_history=vocab_dists_history,
             final_dists_history=final_dists_history)
