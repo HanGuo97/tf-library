@@ -265,8 +265,13 @@ def collect_all_features(extracted_features, word_vocab, label_vocab):
             new_label_ids_list)
 
 
-def tile_dataset(token_ids_list, token_lens_list,
-                 entity_dists, number_dists, label_ids_list):
+def tile_dataset(token_ids_list,
+                 token_lens_list,
+                 entity_dists,
+                 number_dists,
+                 label_ids_list,
+                 tile=True,
+                 expand_label=False):
     """
     Original label_ids_list contains multiple ground-truth
     labels for a given input pairs. Here we tile datasets
@@ -295,12 +300,25 @@ def tile_dataset(token_ids_list, token_lens_list,
         number_dist = number_dists[row_idx, :]
         label_ids = label_ids_list[row_idx, :]
         
-        for label_idx in range(label_ids[-1]):
+        if not tile:
             tiled_tokens.append(token_ids)
             tiled_token_lens.append(token_lens)
             tiled_entity_dists.append(entity_dist)
             tiled_number_dists.append(number_dist)
-            tiled_label_ids.append(label_ids[label_idx])
+            tiled_label_ids.append(label_ids)
+
+        else:
+            for label_idx in range(label_ids[-1]):
+                if expand_label:
+                    _label_ids = np.expand_dims(label_ids[label_idx], axis=-1)
+                else:
+                    _label_ids = label_ids[label_idx]
+
+                tiled_tokens.append(token_ids)
+                tiled_token_lens.append(token_lens)
+                tiled_entity_dists.append(entity_dist)
+                tiled_number_dists.append(number_dist)
+                tiled_label_ids.append(_label_ids)
     
     return (tiled_tokens,
             tiled_token_lens,
