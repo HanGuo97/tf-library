@@ -40,10 +40,6 @@ class LstmEncoder(base_models.BaseEncoder):
         self._dropout_rate = dropout_rate
         self._num_residual_layers = num_residual_layers
 
-    @property
-    def output_size(self):
-        return self._cell.output_size
-
     def build(self):
         mode = "train" if self._is_training else "inference"
 
@@ -109,7 +105,6 @@ class LstmEncoder(base_models.BaseEncoder):
 
 class TempConvEncoder(base_models.BaseEncoder):
     def __init__(self,
-                 num_units,
                  filters,
                  kernel_sizes,
                  pool_size=2,
@@ -122,7 +117,6 @@ class TempConvEncoder(base_models.BaseEncoder):
         if not isinstance(kernel_sizes, (tuple, list)):
             raise ValueError("kernel_sizes must be a list")
 
-        self._num_units = num_units
         self._filters = filters
         self._kernel_sizes = kernel_sizes
         self._pool_size = pool_size
@@ -133,10 +127,6 @@ class TempConvEncoder(base_models.BaseEncoder):
         
         self._encoder_scope = scope
         self._is_training = is_training
-
-    @property
-    def output_size(self):
-        return self._hps.num_units
 
     def build(self):
         norm_layers = []
