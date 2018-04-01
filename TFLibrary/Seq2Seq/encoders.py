@@ -114,8 +114,8 @@ class TempConvEncoder(base_models.BaseEncoder):
                  use_bias=True,
                  scope="TempConvEncoder",
                  is_training=True):
-#         if not isinstance(kernel_sizes, (tuple, list)):
-#             raise ValueError("kernel_sizes must be a list")
+        if not isinstance(kernel_sizes, (tuple, list)):
+            raise ValueError("kernel_sizes must be a list")
 
         self._filters = filters
         self._kernel_sizes = kernel_sizes
