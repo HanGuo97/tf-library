@@ -14,7 +14,7 @@ from TFLibrary.Data.data2text import original_data_utils as orig_utils
 DATA_BASE_DIR = "/Users/AlexGuo/Downloads/boxscore-data/rotowire"
 TRAIN_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/train.json"
 VAL_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/valid.json"
-TEST_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/valid.json"
+TEST_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/test.json"
 
 
 def build_extration_data(train_json_file=TRAIN_JSON,

@@ -1,6 +1,11 @@
 import tensorflow as tf
 # import tensorflow.contrib.eager as tfe
 # tfe.enable_eager_execution()
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import rnn_cell_impl
+from tensorflow.python.ops import variable_scope as vs
+
 from TFLibrary.Seq2Seq.pointer_cell import PointerWrapper
 from TFLibrary.SPG import pg_decoder
 from TFLibrary.utils import test_utils
@@ -98,6 +103,18 @@ def check_tensor_equality(X, Y):
         raise AssertionError("FAILED")
 
 
+def stack_and_transpose(X):
+    X = array_ops.stack(X)
+    X = array_ops.transpose(X, perm=[1, 0, 2])
+    return X
+
+
+def stack_and_transpose_TA(X):
+    X = X.stack()
+    X = array_ops.transpose(X, perm=[1, 0, 2])
+    return X
+
+
 def test_attention():
     """TEST ATTENTION
     
@@ -118,8 +135,6 @@ def test_attention():
         attention_mechanism=attention_mechanism,
         alignment_history=True,
         attention_layer=pointer_cell._attention_layer)
-    
-
 
     (poiner_cell_outputs,
      poiner_cell_state) = tf.nn.dynamic_rnn(
@@ -145,6 +160,43 @@ def test_attention():
     
 
     return attention_cell, attention_cell_outputs, attention_cell_state
+
+
+def test_pointer():
+    (pointer_cell,
+     cell,
+     memories,
+     attention_mechanism,
+     enc_batch_extended_vocab,
+     decoder_inputs,
+     enc_padding_mask) = setup_pointer_cell()
+
+    (poiner_cell_outputs,
+     poiner_cell_state) = tf.nn.dynamic_rnn(
+        cell=pointer_cell, inputs=decoder_inputs, dtype=tf.float32)
+
+
+    def _calculate_p_gens(contexts, cell_states, cell_inputs, pgen_layer):
+        p_gens = array_ops.concat([
+            _stack_and_transpose(contexts),
+            _stack_and_transpose([s[-1].c for s in cell_states]),
+            _stack_and_transpose([s[-1].h for s in cell_states]),
+            _stack_and_transpose(cell_inputs)], axis=-1)
+        p_gens = pgen_layer(p_gens)
+        return p_gens
+
+    # Expected Outputs
+    # -------------------------------------------------------
+    pgens = _calculate_p_gens(
+        all_context,
+        all_next_cell_state,
+        all_cell_inputs,
+        debug_variables["pgen_kernel"])
+    
+    pgens_diff = pgens - p_gens
+    test_utils.tensor_is_zero(sess, pgens_diff, "PgensDIff")
+
+
 
 
 

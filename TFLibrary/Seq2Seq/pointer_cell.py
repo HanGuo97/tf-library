@@ -95,9 +95,11 @@ def _calc_final_dist(vocab_dist, attn_dist, p_gen,
 PointerWrapperState = namedtuple(
     "PointerWrapperState",
     ("cell_state", "time",  # RNN Cell
-    "attention", "alignments", "alignment_history",  # Attention
-    "p_gen", "coverage", "p_gen_history", "coverage_history",
-    "logits_history", "vocab_dists_history", "final_dists_history"))  # Pointer
+     "attention", "alignments",
+     "context_history", "alignment_history",  # Attention
+     "p_gen", "coverage", "p_gen_history",
+     "coverage_history", "logits_history",
+     "vocab_dists_history", "final_dists_history"))  # Pointer
 
 
 class PointerWrapper(rnn_cell_impl.RNNCell):
@@ -235,6 +237,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
             # Attentions
             attention=self._attention_layer_size,
             alignments=self._attention_mechanism.alignments_size,
+            context_history=(),
             alignment_history=(),  # sometimes a TensorArray
             # Pointers
             # p_gen \in [0,1]
@@ -276,6 +279,9 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
                 batch_size=batch_size, dtype=dtype)
 
             # all kinds of histories
+            zero_context_history = (tensor_array_ops.TensorArray(
+                dtype=dtype, size=0, dynamic_size=True)
+                if self._alignment_history else ())
             zero_alignment_history = (tensor_array_ops.TensorArray(
                 dtype=dtype, size=0, dynamic_size=True)
                 if self._alignment_history else ())
@@ -302,6 +308,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
                 # Attention
                 attention=zero_attention,
                 alignments=zero_alignments,
+                context_history=zero_context_history,
                 alignment_history=zero_alignment_history,
                 # Pointers
                 p_gen=array_ops.zeros([batch_size, 1], dtype=dtypes.float32),
@@ -388,6 +395,8 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
 
         # Step 5: log histories
         time = state.time
+        context_history = state.context_history.write(
+            time, context) if self._alignment_history else ()
         alignment_history = state.alignment_history.write(
             time, alignments) if self._alignment_history else ()
         coverage_history = state.coverage_history.write(time, coverage)
@@ -404,6 +413,7 @@ class PointerWrapper(rnn_cell_impl.RNNCell):
             # Attention
             attention=attention,
             alignments=alignments,
+            context_history=context_history,
             alignment_history=alignment_history,
             # Pointer
             p_gen=p_gen,

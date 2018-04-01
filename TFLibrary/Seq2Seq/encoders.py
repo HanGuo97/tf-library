@@ -4,8 +4,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import rnn as rnn_ops
+from tensorflow.python.layers import convolutional
+from tensorflow.python.layers import normalization
+from tensorflow.python.layers import pooling
 from tensorflow.python.framework import dtypes
 
 from TFLibrary.Seq2Seq import base_models
@@ -22,7 +26,7 @@ class LstmEncoder(base_models.BaseEncoder):
                  num_layers=1,
                  dropout_rate=None,
                  num_residual_layers=0,
-                 scope="encoder",
+                 scope="LstmEncoder",
                  is_training=True,  # only for dropout
                  bidirectional=True):
         
@@ -105,14 +109,28 @@ class LstmEncoder(base_models.BaseEncoder):
 
 class TempConvEncoder(base_models.BaseEncoder):
     def __init__(self,
-                 widths,
                  num_units,
-                 scope="encoder",
-                 is_training=True,
-                 bidirectional=True):
+                 filters,
+                 kernel_sizes,
+                 pool_size=2,
+                 strides=1,
+                 padding='same',
+                 activation=nn_ops.relu,
+                 use_bias=True,
+                 scope="TempConvEncoder",
+                 is_training=True):
+        if not isinstance(kernel_sizes, (tuple, list)):
+            raise ValueError("kernel_sizes must be a list")
 
-        self._widths = widths
         self._num_units = num_units
+        self._filters = filters
+        self._kernel_sizes = kernel_sizes
+        self._pool_size = pool_size
+        self._strides = strides
+        self._padding = padding
+        self._activation = activation
+        self._use_bias = use_bias
+        
         self._encoder_scope = scope
         self._is_training = is_training
 
@@ -121,7 +139,44 @@ class TempConvEncoder(base_models.BaseEncoder):
         return self._hps.num_units
 
     def build(self):
-        pass
+        norm_layers = []
+        conv_layers = []
+        pool_layers = []
+
+        for layer_id, kernel_size in enumerate(self._kernel_sizes):
+            norm_layer = normalization.BatchNormalization(
+                name="BatchNormalization_%d" % layer_id)
+            conv_layer = convolutional.Conv1D(
+                filters=self._filters,
+                kernel_size=kernel_size,
+                strides=self._strides,
+                padding=self._padding,
+                activation=self._activation,
+                use_bias=self._use_bias,
+                name="Conv1D_%d" % layer_id)
+            pool_layer = pooling.MaxPooling1D(
+                pool_size=self._pool_size,
+                strides=self._strides,
+                padding=self._padding,
+                name="MaxPooling1D_%d" % layer_id)
+
+            norm_layers.append(norm_layer)
+            conv_layers.append(conv_layer)
+            pool_layers.append(pool_layer)
+
+        self._norm_layers = norm_layers
+        self._conv_layers = conv_layers
+        self._pool_layers = pool_layers
 
     def encode(self, inputs):
-        pass
+        all_outputs = []
+        for norm_layer, conv_layer, pool_layer in zip(
+                self._norm_layers, self._conv_layers, self._pool_layers):
+
+            outputs = norm_layer(inputs)
+            outputs = conv_layer(outputs, training=self._is_training)
+            outputs = pool_layer(outputs)
+            all_outputs.append(outputs)
+
+        all_outputs = array_ops.concat(all_outputs, axis=-1)
+        return outputs
