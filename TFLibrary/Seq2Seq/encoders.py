@@ -173,8 +173,8 @@ class TempConvEncoder(base_models.BaseEncoder):
         for norm_layer, conv_layer, pool_layer in zip(
                 self._norm_layers, self._conv_layers, self._pool_layers):
 
-            outputs = norm_layer(inputs)
-            outputs = conv_layer(outputs, training=self._is_training)
+            outputs = norm_layer(inputs, training=self._is_training)
+            outputs = conv_layer(outputs)
             outputs = pool_layer(outputs)
             all_outputs.append(outputs)
 
