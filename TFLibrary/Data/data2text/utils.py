@@ -305,9 +305,10 @@ def tile_dataset(token_ids_list,
             tiled_token_lens.append(token_lens)
             tiled_entity_dists.append(entity_dist)
             tiled_number_dists.append(number_dist)
-            tiled_label_ids.append(label_ids)
+            tiled_label_ids.append(label_ids[:-1])
 
         else:
+            # the last element contains the number of labels
             for label_idx in range(label_ids[-1]):
                 if expand_label:
                     _label_ids = np.expand_dims(label_ids[label_idx], axis=-1)
