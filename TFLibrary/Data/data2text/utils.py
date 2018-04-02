@@ -271,7 +271,8 @@ def tile_dataset(token_ids_list,
                  number_dists,
                  label_ids_list,
                  tile=True,
-                 expand_label=False):
+                 expand_label=False,
+                 test=False):
     """
     Original label_ids_list contains multiple ground-truth
     labels for a given input pairs. Here we tile datasets
@@ -320,6 +321,9 @@ def tile_dataset(token_ids_list,
                 tiled_entity_dists.append(entity_dist)
                 tiled_number_dists.append(number_dist)
                 tiled_label_ids.append(_label_ids)
+
+                if test:
+                    break
     
     return (tiled_tokens,
             tiled_token_lens,
