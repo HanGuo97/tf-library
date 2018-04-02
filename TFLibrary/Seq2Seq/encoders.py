@@ -6,6 +6,7 @@ from __future__ import print_function
 
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import rnn as rnn_ops
 from tensorflow.python.layers import convolutional
 from tensorflow.python.layers import normalization
@@ -168,5 +169,5 @@ class TempConvEncoder(base_models.BaseEncoder):
             outputs = pool_layer(outputs)
             all_outputs.append(outputs)
 
-        all_outputs = array_ops.concat(all_outputs, axis=-1)
+        all_outputs = math_ops.reduce_mean(all_outputs, axis=-1)
         return outputs
