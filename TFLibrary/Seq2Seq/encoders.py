@@ -175,4 +175,5 @@ class TempConvEncoder(base_models.BaseEncoder):
         print(all_outputs)
         # [batch_size, num_filters x num_kernels]
         all_outputs = math_ops.reduce_mean(all_outputs, axis=1)
+        print(all_outputs)
         return outputs
