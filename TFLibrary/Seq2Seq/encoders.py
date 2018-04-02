@@ -168,12 +168,9 @@ class TempConvEncoder(base_models.BaseEncoder):
             outputs = conv_layer(outputs)
             outputs = pool_layer(outputs)
             all_outputs.append(outputs)
-            print(outputs)
 
         # [batch_size, sequence_length, num_filters x num_kernels]
         all_outputs = array_ops.concat(all_outputs, axis=-1)
-        print(all_outputs)
         # [batch_size, num_filters x num_kernels]
         all_outputs = math_ops.reduce_mean(all_outputs, axis=1)
-        print(all_outputs)
         return outputs
