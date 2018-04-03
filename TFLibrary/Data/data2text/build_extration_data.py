@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import json
 import h5py
+import pickle
 import codecs
 import numpy as np
 from collections import Counter
