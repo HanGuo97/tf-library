@@ -20,7 +20,8 @@ TEST_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/test.json"
 def build_extration_data(train_json_file=TRAIN_JSON,
                          val_json_file=VAL_JSON,
                          test_json_file=TEST_JSON,
-                         output_file="./IE_data"):
+                         output_file="./IE_data",
+                         lower_case_words=False):
     # print("WARNING: RE-BUILD THE DATA TO ENSURE THEY ARE THE LATEST")
     # ===========================================================
     # set_up
@@ -40,7 +41,7 @@ def build_extration_data(train_json_file=TRAIN_JSON,
      players,
      teams,
      cities) = utils.extract_entities_from_json(
-        json_file=train_json_file, lower=False)
+        json_file=train_json_file, lower=lower_case_words)
 
     # ===========================================================
     # process_candidate_rels
