@@ -57,10 +57,7 @@ def _process_compound_words(entities):
     return additional_entities
 
 
-def extract_entities_from_json(json_file, lower=True):
-    with codecs.open(json_file, "r", "utf-8") as f:
-        raw_data = json.load(f)
-
+def extract_entities_from_json(raw_data):
     teams = []
     cities = []
     players = []
@@ -97,14 +94,6 @@ def extract_entities_from_json(json_file, lower=True):
     teams = set(teams)
     cities = set(cities)
     players = set(players)
-
-    if lower:
-        # in debugging, will not use lower
-        # to compare against original implementation
-        # which does not do the lower-case
-        teams = set(map(lambda s: s.lower(), teams))
-        cities = set(map(lambda s: s.lower(), cities))
-        players = set(map(lambda s: s.lower(), players))
 
     all_entities = players | teams | cities
     return all_entities, players, teams, cities
@@ -336,17 +325,21 @@ def prepare_generated_data(train_json_file,
                            token_dict=None,
                            label_dict=None):
 
-    # Step 1: extract all the entities etc from train data
-    all_entities, players, teams, cities = extract_entities_from_json(
-        train_json_file, lower=False)
+    raise NotImplementedError("This function is depreciated")
 
     # read all relevant files
     with codecs.open(gen_file, "r", "utf-8") as f:
         generated_summaries = f.readlines()
+    with codecs.open(train_json_file, "r", "utf-8") as f:
+        train_data = json.load(f)
     with codecs.open(eval_json_file, "r", "utf-8") as f:
         eval_data = json.load(f)
     if len(eval_data) != len(generated_summaries):
         raise ValueError
+
+    # Step 1: extract all the entities etc from train data
+    all_entities, players, teams, cities = extract_entities_from_json(
+        raw_data=train_data)
 
     # Step 2: extract all the candidate relationship pairs
     candidate_relations = []  # to hold (sentence_tokens, [rels]) tuples

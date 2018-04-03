@@ -22,8 +22,10 @@ random.seed(2)
 
 
 prons = set(["he", "He", "him", "Him", "his", "His", "they",
-             "They", "them", "Them", "their", "Their"])  # leave out "it"
-singular_prons = set(["he", "He", "him", "Him", "his", "His"])
+             "They", "them", "Them", "their", "Their",
+             "she", "She", "her", "Her", "hers", "Hers"])  # leave out "it"
+singular_prons = set(["he", "He", "him", "Him", "his", "His",
+                      "she", "She", "her", "Her", "hers", "Hers"])
 plural_prons = set(["they", "They", "them", "Them", "their", "Their"])
 
 number_words = set(["one", "two", "three", "four", "five", "six", "seven", "eight", "nine",

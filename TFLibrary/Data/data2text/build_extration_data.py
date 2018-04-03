@@ -7,21 +7,21 @@ import h5py
 import codecs
 import numpy as np
 from collections import Counter
+from TFLibrary.utils import misc_utils
 from TFLibrary.Data.data2text import utils
 from TFLibrary.Data.data2text import vocabulary
 from TFLibrary.Data.data2text import original_data_utils as orig_utils
 
-DATA_BASE_DIR = "/Users/AlexGuo/Downloads/boxscore-data/rotowire"
-TRAIN_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/train.json"
-VAL_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/valid.json"
-TEST_JSON = "/Users/AlexGuo/Downloads/boxscore-data/rotowire/test.json"
+DATA_BASE_DIR = "/Users/AlexGuo/Downloads/boxscore-data-new/rotowire"
+TRAIN_JSON = "/Users/AlexGuo/Downloads/boxscore-data-new/rotowire/train.json"
+VAL_JSON = "/Users/AlexGuo/Downloads/boxscore-data-new/rotowire/valid.json"
+TEST_JSON = "/Users/AlexGuo/Downloads/boxscore-data-new/rotowire/test.json"
 
 
 def build_extration_data(train_json_file=TRAIN_JSON,
                          val_json_file=VAL_JSON,
                          test_json_file=TEST_JSON,
-                         output_file="./IE_data",
-                         lower_case_words=False):
+                         output_file="./IE_data"):
     # print("WARNING: RE-BUILD THE DATA TO ENSURE THEY ARE THE LATEST")
     # ===========================================================
     # set_up
@@ -40,8 +40,7 @@ def build_extration_data(train_json_file=TRAIN_JSON,
     (all_entities,
      players,
      teams,
-     cities) = utils.extract_entities_from_json(
-        json_file=train_json_file, lower=lower_case_words)
+     cities) = utils.extract_entities_from_json(raw_data=train_data)
 
     # ===========================================================
     # process_candidate_rels
@@ -118,6 +117,12 @@ def build_extration_data(train_json_file=TRAIN_JSON,
     # write vocabs
     word_vocab.save(output_file + ".word_vocab")
     label_vocab.save(output_file + ".label_vocab")
+
+    # save objects for future use
+    misc_utils.save_object(all_entities, output_file + ".entities")
+    misc_utils.save_object(players, output_file + ".players")
+    misc_utils.save_object(teams, output_file + ".teams")
+    misc_utils.save_object(cities, output_file + ".cities")
     
     # write datasets
     list2arr = lambda l: np.array(l)
