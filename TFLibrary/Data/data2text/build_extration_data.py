@@ -21,7 +21,7 @@ def build_extration_data(train_json_file=TRAIN_JSON,
                          val_json_file=VAL_JSON,
                          test_json_file=TEST_JSON,
                          output_file="./IE_data"):
-    print("WARNING: RE-BUILD THE DATA TO ENSURE THEY ARE THE LATEST")
+    # print("WARNING: RE-BUILD THE DATA TO ENSURE THEY ARE THE LATEST")
     # ===========================================================
     # set_up
     # ===========================================================
