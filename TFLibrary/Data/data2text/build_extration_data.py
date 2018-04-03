@@ -161,3 +161,77 @@ def build_extration_data(train_json_file=TRAIN_JSON,
             data=list2arr(test_label_ids_list))
 
     print("Finished Saving Files to ", output_file)
+
+
+
+def prepare_extraction_data_for_eval(json_file,
+                                     IE_data_file,
+                                     summary_file,
+                                     output_file):
+    # ===========================================================
+    # set_up and load all relevant data
+    # ===========================================================
+    with codecs.open(json_file, "r", "utf-8") as f:
+        dataset = json.load(f)
+    with codecs.open(summary_file, "r", "utf-8") as f:
+        summaries = [d.strip() for d in f.readlines()]
+
+    with open(IE_data_file + ".entities", 'rb') as handle:
+        all_entities = pickle.load(handle)
+    with open(IE_data_file + ".players", 'rb') as handle:
+        players = pickle.load(handle)
+    with open(IE_data_file + ".teams", 'rb') as handle:
+        teams = pickle.load(handle)
+    with open(IE_data_file + ".cities", 'rb') as handle:
+        cities = pickle.load(handle)
+
+    word_vocab = vocabulary.Vocabulary([])
+    label_vocab = vocabulary.Vocabulary([])
+    word_vocab.load(IE_data_file + ".word_vocab")
+    label_vocab.load(IE_data_file + ".label_vocab")
+
+    # ===========================================================
+    # process_candidate_rels
+    # ===========================================================
+    nugz = []
+    for entry, summary in zip(dataset, summaries):
+        _nugz = utils.process_candidate_rels(
+            entry=entry,
+            summary=summary,
+            all_entities=all_entities,
+            pronouns=orig_utils.prons,
+            players=players,
+            teams=teams,
+            cities=cities)
+
+        # use += (), this is hard to debug
+        nugz += (_nugz)
+    extracted = nugz
+
+    # ===========================================================
+    # process_multilabeled_data and append_labelnums
+    # ===========================================================
+    (token_ids_list,
+     token_lens_list,
+     entity_dists,
+     number_dists,
+     label_ids_list) = utils.collect_all_features(
+        extracted_features=extracted,
+        word_vocab=word_vocab,
+        label_vocab=label_vocab)
+
+    # write datasets
+    list2arr = lambda l: np.array(l)
+    with h5py.File(output_file + ".data", "w") as f:
+        f.create_dataset("evaluation/token_ids_list",
+            data=list2arr(token_ids_list))
+        f.create_dataset("evaluation/token_lens_list",
+            data=list2arr(token_lens_list))
+        f.create_dataset("evaluation/entity_dists",
+            data=list2arr(entity_dists))
+        f.create_dataset("evaluation/number_dists",
+            data=list2arr(number_dists))
+        f.create_dataset("evaluation/label_ids_list",
+            data=list2arr(label_ids_list))
+
+    print("Finished Saving Files to ", output_file)
