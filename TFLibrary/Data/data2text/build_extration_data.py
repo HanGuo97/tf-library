@@ -168,7 +168,8 @@ def build_extration_data(train_json_file=TRAIN_JSON,
 def prepare_extraction_data_for_eval(json_file,
                                      IE_data_file,
                                      summary_file,
-                                     output_file):
+                                     output_file,
+                                     summmary_process_fn=None):
     # ===========================================================
     # set_up and load all relevant data
     # ===========================================================
@@ -190,6 +191,11 @@ def prepare_extraction_data_for_eval(json_file,
     label_vocab = vocabulary.Vocabulary([])
     word_vocab.load(IE_data_file + ".word_vocab")
     label_vocab.load(IE_data_file + ".label_vocab")
+
+    if summmary_process_fn:
+        if not callable(summmary_process_fn):
+            raise TypeError("summmary_process_fn not callable")
+        summaries = summmary_process_fn(summaries)
 
     # ===========================================================
     # process_candidate_rels

@@ -340,3 +340,10 @@ def preprocess_box_score(data, verbose=True):
             processed_examples,
             compound_words_dicts)
 
+
+def reverse_outputs(summaries, join_by="[SPACE]"):
+    reversed_summaries = []
+    for summary in summaries:
+        reversed_summary = summary.replace(join_by, " ")
+        reversed_summaries.append(reversed_summary)
+    return reversed_summaries
