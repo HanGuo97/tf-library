@@ -1,8 +1,21 @@
 import os
+import sys
 import random
 import pickle
 import numpy as np
 from collections import deque
+from contextlib import contextmanager
+
+
+@contextmanager
+def suppress_stdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:  
+            yield
+        finally:
+            sys.stdout = old_stdout
 
 
 def save_object(obj, filename):
