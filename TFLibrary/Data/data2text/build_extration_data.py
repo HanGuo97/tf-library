@@ -200,8 +200,7 @@ def prepare_extraction_data_for_eval(json_file,
     # ===========================================================
     # process_candidate_rels
     # ===========================================================
-    reference_nugz = []
-    predicted_nugz = []
+    nugz = []
     for entry, summary in zip(dataset, summaries):
         _nugz = utils.process_candidate_rels(
             entry=entry,
