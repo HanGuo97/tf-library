@@ -92,7 +92,7 @@ def build_extration_data(train_json_file=TRAIN_JSON,
      train_token_lens_list,
      train_entity_dists,
      train_number_dists,
-     train_label_ids_list) = utils.collect_all_features(
+     train_label_ids_list, _) = utils.collect_all_features(
         extracted_features=extracted[0],
         word_vocab=word_vocab,
         label_vocab=label_vocab)
@@ -101,7 +101,7 @@ def build_extration_data(train_json_file=TRAIN_JSON,
      val_token_lens_list,
      val_entity_dists,
      val_number_dists,
-     val_label_ids_list) = utils.collect_all_features(
+     val_label_ids_list, _) = utils.collect_all_features(
         extracted_features=extracted[1],
         word_vocab=word_vocab,
         label_vocab=label_vocab)
@@ -110,7 +110,7 @@ def build_extration_data(train_json_file=TRAIN_JSON,
      test_token_lens_list,
      test_entity_dists,
      test_number_dists,
-     test_label_ids_list) = utils.collect_all_features(
+     test_label_ids_list, _) = utils.collect_all_features(
         extracted_features=extracted[2],
         word_vocab=word_vocab,
         label_vocab=label_vocab)
@@ -233,10 +233,12 @@ def prepare_extraction_data_for_eval(json_file,
      token_lens_list,
      entity_dists,
      number_dists,
-     label_ids_list) = utils.collect_all_features(
+     label_ids_list,
+     tiled_indices) = utils.collect_all_features(
         extracted_features=extracted,
         word_vocab=word_vocab,
-        label_vocab=label_vocab)
+        label_vocab=label_vocab,
+        indices=indices)
 
     # write datasets
     list2arr = lambda l: np.array(l)
@@ -252,6 +254,6 @@ def prepare_extraction_data_for_eval(json_file,
         f.create_dataset("evaluation/label_ids_list",
             data=list2arr(label_ids_list))
         f.create_dataset("evaluation/indices",
-            data=list2arr(indices))
+            data=list2arr(tiled_indices))
 
     print("Finished Saving Files to ", output_file)

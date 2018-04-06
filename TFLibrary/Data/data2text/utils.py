@@ -217,16 +217,29 @@ def append_labelnums(all_label_ids_list, pad_id=-1):
     return new_label_ids_list
 
 
-def collect_all_features(extracted_features, word_vocab, label_vocab):
+def collect_all_features(extracted_features, word_vocab, label_vocab, indices=None):
     all_token_ids_list = []
     all_token_lens_list = []
     all_entity_dists = []
     all_number_dists = []
     all_label_ids_list = []
+
+    # indices are the alignment between extracted_features
+    # and summaries, where len(extracted_features) == len(indices)
+    # here however, every feature can have multiple tokens, lens, etc
+    # thus we have to tile indices by this as well
+    new_indices = []
+    if indices is not None:
+        if len(extracted_features) != len(indices):
+            raise ValueError(len(extracted_features), len(indices))
+        print("# extracted_features = %d\t# indices = %d" %
+             (len(extracted_features),len(indices)))
+
     # for training set
     max_len = max([len(cand_rels.Tokens)
         for cand_rels in extracted_features])
-    for cand_rels in extracted_features:
+    
+    for index, cand_rels in enumerate(extracted_features):
         (token_ids_list,
          token_lens_list,
          entity_dists,
@@ -245,13 +258,21 @@ def collect_all_features(extracted_features, word_vocab, label_vocab):
         all_number_dists += number_dists
         all_label_ids_list += label_ids_list
 
+        # tile the index by the number of extracted things
+        # Note that indices[index] = the corresponding summary index
+        # of each extracted_feature, which already have been tiled
+        if indices is not None:
+            new_indices += [new_indices[index]
+                for _ in range(len(label_ids_list))]
+
     new_label_ids_list = append_labelnums(all_label_ids_list)
 
     return (all_token_ids_list,
             all_token_lens_list,
             all_entity_dists,
             all_number_dists,
-            new_label_ids_list)
+            new_label_ids_list,
+            new_indices)
 
 
 def tile_dataset(token_ids_list,
