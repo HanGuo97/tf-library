@@ -2,6 +2,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
 
+import sys
 import json
 import h5py
 import pickle
@@ -170,6 +171,8 @@ def prepare_extraction_data_for_eval(json_file,
                                      summary_file,
                                      output_file,
                                      summmary_process_fn=None):
+    if sys.version_info.major != 2:
+        raise EnvironmentError("Only Python2 produces consistent results")
     # ===========================================================
     # set_up and load all relevant data
     # ===========================================================
