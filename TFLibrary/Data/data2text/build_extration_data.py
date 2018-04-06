@@ -203,8 +203,12 @@ def prepare_extraction_data_for_eval(json_file,
     # ===========================================================
     # process_candidate_rels
     # ===========================================================
+    
+    # indices is a list of integers that tells which
+    # summary index a certain features correspond to
     nugz = []
-    for entry, summary in zip(dataset, summaries):
+    indices = []
+    for index, (entry, summary) in enumerate(zip(dataset, summaries)):
         _nugz = utils.process_candidate_rels(
             entry=entry,
             summary=summary,
@@ -216,7 +220,11 @@ def prepare_extraction_data_for_eval(json_file,
 
         # use += (), this is hard to debug
         nugz += (_nugz)
+        # keep track of corresponding summary index
+        indices += [index for _ in range(len(_nugz))]
+    
     extracted = nugz
+    print("#Indices = " % len(indices))
 
     # ===========================================================
     # process_multilabeled_data and append_labelnums
@@ -243,5 +251,7 @@ def prepare_extraction_data_for_eval(json_file,
             data=list2arr(number_dists))
         f.create_dataset("evaluation/label_ids_list",
             data=list2arr(label_ids_list))
+        f.create_dataset("evaluation/indices",
+            data=list2arr(indices))
 
     print("Finished Saving Files to ", output_file)
