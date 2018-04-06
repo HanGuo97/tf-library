@@ -262,7 +262,7 @@ def collect_all_features(extracted_features, word_vocab, label_vocab, indices=No
         # Note that indices[index] = the corresponding summary index
         # of each extracted_feature, which already have been tiled
         if indices is not None:
-            new_indices += [new_indices[index]
+            new_indices += [indices[index]
                 for _ in range(len(label_ids_list))]
 
     new_label_ids_list = append_labelnums(all_label_ids_list)
