@@ -224,7 +224,7 @@ def prepare_extraction_data_for_eval(json_file,
         indices += [index for _ in range(len(_nugz))]
     
     extracted = nugz
-    print("#Indices = %d" % len(indices))
+    print("# Indices = %d" % len(indices))
 
     # ===========================================================
     # process_multilabeled_data and append_labelnums
@@ -257,3 +257,7 @@ def prepare_extraction_data_for_eval(json_file,
             data=list2arr(tiled_indices))
 
     print("Finished Saving Files to ", output_file)
+
+
+    # for debugging
+    return indices, tiled_indices

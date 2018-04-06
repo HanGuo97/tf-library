@@ -101,7 +101,6 @@ def test_prepare_extraction_data_for_eval(IE_data_file,
                          "../../DATA/TextSummData/BoxScore/val_target.txt",
                          "../../DATA/TextSummData/BoxScore/test_target.txt"]
         
-        summmary_process_fn = multilabel_accuracy
         test_prepare_extraction_data_for_eval(
             IE_data_file=IE_data_file,
             summary_files=summary_files,
