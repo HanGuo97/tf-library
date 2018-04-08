@@ -142,6 +142,11 @@ class MultiArmedBanditSelector(object):
 
     @property
     def reward_histories(self):
+        # at the start, the update_histories is empty
+        # to avoid nan, we will force set this to 0
+        if len(self._update_histories) == 0:
+            return [0.0]
+
         return [hist[0] for hist in self._update_histories]
 
     def save(self, file_dir):
