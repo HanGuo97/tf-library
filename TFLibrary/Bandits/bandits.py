@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import os
 import pickle
+import warnings
 import numpy as np
 from namedlist import namedlist
 from TFLibrary.Bandits import exp3
@@ -37,31 +38,6 @@ def softmax(X, theta=1.0, axis=None):
     return p
 
 
-def incremental_weighted_mean(V, W, C, G):
-    """
-    Page 89, Equation 5.7
-    http://incompleteideas.net/book/bookdraft2017nov5.pdf
-    
-    V: incremental weighted mean from last time step
-    W: weight of the new value
-    C: count of previous values
-    G: new value
-
-    Calculate:
-        V = sum_k(W_k * G_k) / sum_k(W_k)
-    
-    Incremental Version:
-        C_n+1 = C_n + W_n
-        V_n+1 = V_n + W_n / C_n+1 [G_n - V_n]
-
-    """
-    _C = C + W
-    _V = V + W / _C * (G - V)
-    # _C = C
-    # _V = V + W * (G - V)
-    return _V, _C
-
-
 def gradient_bandit(old_Q, reward, alpha):
     new_Q = old_Q + alpha * (reward - old_Q)
     return new_Q
@@ -81,57 +57,58 @@ def boltzmann_exploration(Q_values, temperature=1.0):
 class MultiArmedBanditSelector(object):
     def __init__(self,
                  num_actions,
-                 initial_weights,
-                 update_method="average",
-                 alpha=0.3,
+                 initial_weight,
+                 update_rate_fn,
+                 reward_shaping_fn,
                  initial_temperature=1.0,
-                 temperature_anneal_rate=None,
-                 log_history=True):
-        if update_method not in ["average", "gradient_bandit", "exp3"]:
-            raise ValueError("Unknown update_method ", update_method)
+                 temperature_anneal_rate=None):
+        """
+        Args:
+            update_rate_fn: fn(step) --> Real
+                a function that takes `step` as input, and produce
+                real value, the gradent bandit update rate.
+                Common functions include:
+                    1. (constant update) lambda step: CONSTANT
+                    2. (average of entire history): lambda step: 1 / (step + 1)
 
-        self._Q_values = [
-            Q_Entry(Value=initial_weights, Count=1)
+            reward_shaping_fn: fn(reward, histories) --> Real
+                a function that takes current and histories of rewards
+                as inputs and produce real value, the reward to be fed into
+                the bandits algorithm
+                Common functions include:
+                    1. lambda reward, hist: reward / CONSTANT
+                    2. lambda reward, hist: [reward - mean(hist)] / std(hist)
+        """
+        if not callable(update_rate_fn):
+            raise TypeError("`update_rate_fn` must be callable")
+        if not callable(reward_shaping_fn):
+            raise TypeError("`reward_shaping_fn` must be callable")
+
+        self._Q_entries = [
+            # intial Count = 1 because of `initial_weight`
+            Q_Entry(Value=initial_weight, Count=1)
             for _ in range(num_actions)]
         self._num_actions = num_actions
-        self._update_method = update_method
+        self._update_rate_fn = update_rate_fn
+        self._reward_shaping_fn = reward_shaping_fn
 
-        self._alpha = alpha
         self._temperature = initial_temperature
         self._temperature_anneal_rate = temperature_anneal_rate
         
-        # save past selections for debugging
-        self._histories = []
-        self._log_history = log_history
+        self._sample_histories = []
+        self._update_histories = []
 
 
-    def sample(self, step=0, one_hot=False):
-        """
-        If return probs, return the selection
-        distributions otherwise, return the sampled actions
-        """
-        if self._update_method in ["average", "gradient_bandit"]:
-            temperature_coef = (
-                np.power(self._temperature_anneal_rate, step)
-                if self._temperature_anneal_rate is not None else 1)
+    def sample(self, step=0):
+        temperature_coef = (  # tau x rate^step
+            np.power(self._temperature_anneal_rate, step)
+            if self._temperature_anneal_rate is not None else 1)
 
-            chosen_action, Q_probs = boltzmann_exploration(
-                Q_values=np.asarray(self.arm_weights),
-                temperature=self._temperature * temperature_coef)
+        chosen_action, Q_probs = boltzmann_exploration(
+            Q_values=np.asarray(self.arm_weights),
+            temperature=self._temperature * temperature_coef)
 
-        elif self._update_method in ["exp3"]:
-            Q_probs = [Q.Count for Q in self._Q_values]
-            Q_probs = [Q / sum(Q_probs) for Q in Q_probs]
-            chosen_action = np.random.choice(self._num_actions, p=Q_probs)
-
-
-        if self._log_history:
-            self._histories.append([Q_probs, chosen_action])
-
-        if one_hot:
-            chosen_action = convert_to_one_hot(
-                action_id=chosen_action,
-                action_space=self._num_actions)
+        self._sample_histories.append([Q_probs, chosen_action])
 
         return chosen_action, Q_probs
 
@@ -142,57 +119,63 @@ class MultiArmedBanditSelector(object):
         if not chosen_arm < self._num_actions:
             raise ValueError("chosen_arm out of range")
 
-        if self._update_method == "average":
-            new_Q, new_C = incremental_weighted_mean(
-                G=reward, W=1,
-                V=self._Q_values[chosen_arm].Value,
-                C=self._Q_values[chosen_arm].Count)
-            self._Q_values[chosen_arm].Value = new_Q
-            self._Q_values[chosen_arm].Count = new_C
+        step_size = self._update_rate_fn(
+            self._Q_entries[chosen_arm].Count)
+        shaped_reward = self._reward_shaping_fn(
+            reward, self.reward_histories)
 
-        elif self._update_method == "gradient_bandit":
-            new_Q = gradient_bandit(
-                reward=reward,
-                alpha=self._alpha,
-                old_Q=self._Q_values[chosen_arm].Value)
-            self._Q_values[chosen_arm].Value = new_Q
-            self._Q_values[chosen_arm].Count += 1
-
-        elif self._update_method == "exp3":
-            probs, new_weights = exp3.exp3_update(
-                sampled=chosen_arm,
-                # non-sampled rewards will be cast to 0.
-                rewards=[reward for _ in range(self._num_actions)],
-                probs=[Q.Count for Q in self._Q_values],
-                weights=[Q.Value for Q in self._Q_values],
-                gamma=self._alpha)
-
-            for chosen_arm in range(self._num_actions):
-                self._Q_values[chosen_arm].Count = probs[chosen_arm]
-                self._Q_values[chosen_arm].Value = new_weights[chosen_arm]
+        new_Q = gradient_bandit(reward=shaped_reward, alpha=step_size,
+                                old_Q=self._Q_entries[chosen_arm].Value)
+        
+        self._Q_entries[chosen_arm].Count += 1
+        self._Q_entries[chosen_arm].Value = new_Q
+        self._update_histories.append([reward, chosen_arm, shaped_reward])
 
 
     @property
     def arm_weights(self):
-        return [Q.Value for Q in self._Q_values]
+        return [Q.Value for Q in self._Q_entries]
+
+    @property
+    def step_counts(self):
+        return np.sum([Q.Count for Q in self._Q_entries])
+
+    @property
+    def reward_histories(self):
+        return [hist[0] for hist in self._update_histories]
 
     def save(self, file_dir):
-        with open(file_dir, "wb") as f:
-            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+        with open(file_dir + "._Q_entries", "wb") as f:
+            pickle.dump(self._Q_entries, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(file_dir + "._sample_histories", "wb") as f:
+            pickle.dump(self._sample_histories, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(file_dir + "._update_histories", "wb") as f:
+            pickle.dump(self._update_histories, f, pickle.HIGHEST_PROTOCOL)
 
         print("INFO: Successfully Saved MABSelector to ", file_dir)
 
     def load(self, file_dir):
-        if not os.path.exists(file_dir):
-            raise ValueError("File not exist ", file_dir)
+        warnings.warn("num_actions are *NOT* checked")
+        for suffix in ["._Q_entries",
+                       "._sample_histories",
+                       "._update_histories"]:
+            if not os.path.exists(file_dir + suffix):
+                raise ValueError("%s File not exist ", suffix)
 
-        with open(file_dir, "rb") as f:
-            dump = pickle.load(f)
+        with open(file_dir + "._Q_entries", "rb") as f:
+            Q_values = pickle.load(f)
 
-        if not self._num_actions == dump._num_actions:
-            raise ValueError("num_actions incompatible")
+        with open(file_dir + "._sample_histories", "rb") as f:
+            sample_histories = pickle.load(f)
+
+        with open(file_dir + "._update_histories", "rb") as f:
+            update_histories = pickle.load(f)
         
-        self._Q_values = dump._Q_values
-        self._histories = dump._histories
+        self._Q_entries = Q_values
+        self._sample_histories = sample_histories
+        self._update_histories = update_histories
 
-        print("INFO: Successfully Loaded MABSelector from ", file_dir)
+        print("INFO: Successfully Loaded %s from %s" %
+            (self.__class__.__name__, file_dir))
