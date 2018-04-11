@@ -8,14 +8,24 @@ from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import rnn as rnn_ops
+from tensorflow.python.ops import check_ops
 from tensorflow.python.layers import convolutional
 from tensorflow.python.layers import normalization
 from tensorflow.python.layers import pooling
 from tensorflow.python.framework import dtypes
+from tensorflow.python.ops import variable_scope as vs
+
+from tensorflow.python.platform import tf_logging as logging_ops
+from tensorflow.python.framework import ops as framework_ops
 
 from TFLibrary.Seq2Seq import base_models
 from TFLibrary.Seq2Seq import rnn_cell_utils
+from TFLibrary.Seq2Seq import lstm_utils
 from TFLibrary.utils import tensorflow_utils
+
+import numpy as np
+from collections import namedtuple
+HierEncTuple = namedtuple("HierEncTuple", ("NumSplits", "Encoder", "Scope"))
 
 
 class LstmEncoder(base_models.BaseEncoder):
@@ -30,11 +40,11 @@ class LstmEncoder(base_models.BaseEncoder):
                  scope="LstmEncoder",
                  is_training=True,  # only for dropout
                  bidirectional=True):
-        
+
         self._encoder_scope = scope
         self._is_training = is_training
         self._bidirectional = bidirectional
-        
+
         self._unit_type = unit_type
         self._num_units = num_units
         self._num_layers = num_layers
@@ -76,7 +86,6 @@ class LstmEncoder(base_models.BaseEncoder):
                 # use default cell creator
                 single_cell_fn=None)
 
-
     def encode(self, inputs, sequence_length=None, initial_state=None):
         if self._bidirectional:
             outputs, state = rnn_ops.bidirectional_dynamic_rnn(
@@ -100,11 +109,12 @@ class LstmEncoder(base_models.BaseEncoder):
                 dtype=dtypes.float32,
                 time_major=False,
                 scope=self._encoder_scope)
-        
+
         return outputs, state
 
 
 class TempConvEncoder(base_models.BaseEncoder):
+
     def __init__(self,
                  filters,
                  kernel_sizes,
@@ -125,7 +135,7 @@ class TempConvEncoder(base_models.BaseEncoder):
         self._padding = padding
         self._activation = activation
         self._use_bias = use_bias
-        
+
         self._encoder_scope = scope
         self._is_training = is_training
 
@@ -174,3 +184,164 @@ class TempConvEncoder(base_models.BaseEncoder):
         # [batch_size, num_filters x num_kernels]
         all_outputs = math_ops.reduce_mean(all_outputs, axis=1)
         return all_outputs
+
+
+class HierarchicalLstmEncoder(base_models.BaseEncoder):
+    """Hierarchical LSTM encoder wrapper.
+    Input sequences will be split into segments based on the first value of
+    `level_lengths` and encoded. At subsequent levels, the embeddings will be
+    grouped based on `level_lengths` and encoded until a single embedding is
+    produced.
+    See the `encode` method for details on the expected arrangement the sequence
+    tensors.
+    Args:
+      core_encoder_cls: A single BaseEncoder class to use for each level of the
+        hierarchy.
+      level_lengths: A list of the (maximum) lengths of the segments at each
+        level of the hierarchy. The product must equal `hparams.max_seq_len`.
+    """
+
+    def __init__(self, core_encoder_cls, level_lengths, total_length, **kargs):
+
+        if not issubclass(core_encoder_cls, base_models.BaseEncoder):
+            raise TypeError(
+                "Expected `core_encoder_cls` to be "
+                "a subclass of base_models.BaseEncoder")
+
+        if not isinstance(level_lengths, (tuple, list)):
+            raise TypeError(
+                "Expected `level_lengths` to be tuple or list "
+                "found ", type(level_lengths))
+
+        # the product of level lengths must equal total lengths
+        # a.k.a. maximum sequence lengths
+        if total_length != np.prod(level_lengths):
+            raise ValueError(
+                "The product of the HierarchicalLstmEncoder "
+                "level lengths (%d) must equal the padded "
+                "input sequence length (%d)." % (
+                    np.prod(level_lengths), total_length))
+
+        self._core_encoder_cls = core_encoder_cls
+        self._level_lengths = level_lengths
+        self._total_length = total_length
+
+        # for building the model
+        self._kargs = kargs
+
+    @property
+    def level_lengths(self):
+        return list(self._level_lengths)
+
+    def level(self, l):
+        """Returns the BaseEncoder at level `l`."""
+        return self._hierarchical_encoders[l].Encoder
+
+    def build(self):
+        logging_ops.info(
+            "\nHierarchical Encoder:\n"
+            "  input length: %d\n"
+            "  level lengths: %s\n",
+            self._total_length,
+            self._level_lengths)
+
+        hierarchical_encoders = []
+        num_splits = np.prod(self._level_lengths)
+        for i, l in enumerate(self._level_lengths):
+            num_splits //= l
+            
+            with vs.variable_scope("hierarchical_encoder/level_%d" % i,
+                                   reuse=vs.AUTO_REUSE) as scope:
+                
+                h_encoder = self._core_encoder_cls(**self._kargs)
+                h_encoder.build()
+
+            hierarchical_encoders.append(
+                HierEncTuple(NumSplits=num_splits,
+                             Encoder=h_encoder,
+                             Scope=scope))
+
+            logging_ops.info("Level %d splits: %d", i, num_splits)
+
+        self._hierarchical_encoders = hierarchical_encoders
+
+    def encode(self, sequence, sequence_length):
+        """Hierarchically encodes the input sequences, returning a single embedding.
+        Each sequence should be padded per-segment. For example, a sequence with
+        three segments [1, 2, 3], [4, 5], [6, 7, 8 ,9] and a `max_seq_len` of 12
+        should be input as `sequence = [1, 2, 3, 0, 4, 5, 0, 0, 6, 7, 8, 9]` with
+        `sequence_length = [3, 2, 4]`.
+        Args:
+          sequence: A batch of (padded) sequences, sized
+            `[batch_size, max_seq_len, input_depth]`.
+          sequence_length: A batch of sequence lengths. May be sized
+            `[batch_size, level_lengths[0]]` or `[batch_size]`. If the latter,
+            each length must either equal `max_seq_len` or 0. In this case, the
+            segment lengths are assumed to be constant and the total length will be
+            evenly divided amongst the segments.
+        Returns:
+          embedding: A batch of embeddings, sized `[batch_size, N]`.
+        """
+        batch_size = sequence.shape[0].value
+
+        # suppose sequence length = [100] * batch_size,
+        # num_splits = 5, then the sequence_length will be
+        # [20, 20, 20, 20, 20] * batch_size
+
+        # suppose level_lengths = [12, 6, 2, 1]
+        # this function will produce num_splits = 6 x 2 x 1 = 12
+        sequence_length = lstm_utils.maybe_split_sequence_lengths(
+            sequence_length=sequence_length,
+            num_splits=np.prod(self._level_lengths[1:]),
+            total_length=self._total_length)
+
+        for level, (num_splits, h_encoder, scope) in enumerate(
+                self._hierarchical_encoders):
+            # encoder.encode()
+            # takes two arguments: sequence, and sequence_length
+
+            # Compute Split sequences
+            # split sequences according to level_lengths[level]
+            split_seqs = array_ops.split(sequence, num_splits, axis=1)
+
+            # Compute Split sequence_length
+            # In Level 0, we use the input `sequence_lengths`.
+            # After that, we use the full embedding sequences.
+            if level == 0:
+                # Actually, I believe the level != 0 assignment
+                # can still work on level == 0
+                sequence_length = sequence_length
+            else:
+                # [single_seq_len, ...] for length num_splits
+                # and tile over batch sizes
+                single_seq_len = split_seqs[0].shape[1]
+                sequence_length = array_ops.fill(
+                    value=single_seq_len,
+                    dims=[batch_size, num_splits])
+
+            # from [batch_size, num_splits, num_units] to
+            # list of [batch_size, num_units] with length num_splits
+            split_lengths = array_ops.unstack(sequence_length, axis=1)
+            
+            # list of [batch_size, num_units] with length num_splits
+            embeddings = [h_encoder.encode(s, l)
+                for s, l in zip(split_seqs, split_lengths)]
+            
+            # back to [batch_size, num_splits, num_units]
+            sequence = array_ops.stack(embeddings, axis=1)
+
+
+        # I am commenting out below codes, since they were borrowed
+        # from Magenta's github, and assumes the final output to be
+        # a vector rather than sequence of vectors
+
+#         with framework_ops.control_dependencies(
+#                 [check_ops.assert_equal(
+#                     array_ops.shape(sequence)[1], 1,
+#                     message="Outputs of the last layer in "
+#                             "hierarchical encoders as "
+#                             "sequence_length == level_lengths[-1]")]):
+#             # the same as sequence[:, 0, :]
+#             return sequence[:, 0]
+
+        return sequence
