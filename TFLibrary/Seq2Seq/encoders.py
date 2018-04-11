@@ -304,12 +304,23 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
             # Compute Split sequences
             # split sequences according to level_lengths[level]
             split_seqs = array_ops.split(sequence, num_splits, axis=1)
-
+            
             # Compute Split sequence_length
+
+            # In the first level, we use the input `sequence_lengths`.
+            # After that, we calculate the lengths from the full
+            # embedding sequences. we do this because in the first level,
+            # if we use length from sequences (which usually has unknown
+            # length), it will cause errors as tf.fill
+            # cannot take unknown sequence length as inputs
+            
+            if level == 0:
+                single_seq_len = self._level_lengths[0]
+            else:
+                single_seq_len = split_seqs[0].shape[1]
+
             # [single_seq_len, ...] for length num_splits
             # and tile over batch sizes
-            single_seq_len = split_seqs[0].shape[1]
-            print("single_seq_len, ", single_seq_len, "sequence, ", sequence, "num_splits, ", num_splits)
             sequence_length = array_ops.fill(
                 value=single_seq_len,
                 dims=[batch_size, num_splits])
