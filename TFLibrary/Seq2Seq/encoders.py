@@ -309,7 +309,7 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
             # [single_seq_len, ...] for length num_splits
             # and tile over batch sizes
             single_seq_len = split_seqs[0].shape[1]
-            print("single_seq_len, ", single_seq_len)
+            print("single_seq_len, ", single_seq_len, "sequence, ", sequence, "num_splits, ", num_splits)
             sequence_length = array_ops.fill(
                 value=single_seq_len,
                 dims=[batch_size, num_splits])
