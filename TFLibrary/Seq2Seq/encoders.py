@@ -217,12 +217,12 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
                 "Expected `level_lengths` to be tuple or list "
                 "found ", type(level_lengths))
 
-        # the product of level lengths must equal total lengths
+        # the product of level lengths must <= total lengths
         # a.k.a. maximum sequence lengths
-        if total_length != np.prod(level_lengths):
+        if total_length < np.prod(level_lengths):
             raise ValueError(
                 "The product of the HierarchicalLstmEncoder "
-                "level lengths (%d) must equal the padded "
+                "level lengths (%d) must >= the padded "
                 "input sequence length (%d)." % (
                     np.prod(level_lengths), total_length))
 
@@ -250,7 +250,7 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
             self._level_lengths)
 
         hierarchical_encoders = []
-        num_splits = np.prod(self._level_lengths)
+        num_splits = self._total_length
         for i, l in enumerate(self._level_lengths):
             num_splits //= l
             
@@ -292,19 +292,10 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
         if not tensor_util.is_tensor(sequence_length):
             raise TypeError("`sequence_length` must be tf.Tensor")
 
+        # batch_size is used for tiling the sequence length
         batch_size = sequence.shape[0].value
-
-        # suppose sequence length = [100] * batch_size,
-        # num_splits = 5, then the sequence_length will be
-        # [20, 20, 20, 20, 20] * batch_size
-
-        # suppose level_lengths = [12, 6, 2, 1]
-        # this function will produce num_splits = 6 x 2 x 1 = 12
-        sequence_length = lstm_utils.maybe_split_sequence_lengths(
-            sequence_length=sequence_length,
-            num_splits=np.prod(self._level_lengths[1:]),
-            total_length=self._total_length)
-
+        
+        # recursively encode sequences
         for level, (num_splits, h_encoder, scope) in enumerate(
                 self._hierarchical_encoders):
             # encoder.encode()
@@ -315,19 +306,12 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
             split_seqs = array_ops.split(sequence, num_splits, axis=1)
 
             # Compute Split sequence_length
-            # In Level 0, we use the input `sequence_lengths`.
-            # After that, we use the full embedding sequences.
-            if level == 0:
-                # Actually, I believe the level != 0 assignment
-                # can still work on level == 0
-                sequence_length = sequence_length
-            else:
-                # [single_seq_len, ...] for length num_splits
-                # and tile over batch sizes
-                single_seq_len = split_seqs[0].shape[1]
-                sequence_length = array_ops.fill(
-                    value=single_seq_len,
-                    dims=[batch_size, num_splits])
+            # [single_seq_len, ...] for length num_splits
+            # and tile over batch sizes
+            single_seq_len = split_seqs[0].shape[1]
+            sequence_length = array_ops.fill(
+                value=single_seq_len,
+                dims=[batch_size, num_splits])
 
             # from [batch_size, num_splits, num_units] to
             # list of [batch_size, num_units] with length num_splits
@@ -338,36 +322,22 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
                 for s, l in zip(split_seqs, split_lengths)])
 
             # to propagate into the next level
-            # we only need the last cell states from the current level
+            # we only need the last cell states for each sub-sequence
             
-            # we first extract the last h for each sub-sequence
+            # first extract the last h for each sub-sequence
             # concatenate them if there are multiple h (e.g. bidirectional)
-            # then we stack them into the sequence_length dimention
+            # then we stack h's for all sub-sequences
+            # into the sequence_length dimention
+            # [batch_size, num_splits, num_units]
 
-            # here we hard-code using bidirectional LSTM, and thus
-            last_states = lstm_utils.extract_and_concat_bidir_last_h(states)
+            # here we hard-code using bidirectional LSTM
+            # list of [batch_size, num_units] with length num_splits
+            states_concat = lstm_utils.extract_and_concat_bidir_last_h(states)
 
             # back to [batch_size, num_splits, num_units]
-            sequence = array_ops.stack(last_states, axis=1)
+            sequence = array_ops.stack(states_concat, axis=1)
 
-
-        # the last level must have sequence length 1
-        with framework_ops.control_dependencies(
-                [check_ops.assert_equal(
-                    array_ops.shape(sequence)[1], 1,
-                    message="Outputs of the last layer in "
-                            "hierarchical encoders as "
-                            "sequence_length == level_lengths[-1]")]):
-
-            if len(outputs) != 1:
-                raise ValueError("outputs in the last level must be 1")
-
-            # we return both cell_outputs and last_cell_states
-            # cell_outputs are the cell_outputs from the second last level
-            # (since the last level) will have sequence_length 1
-            # last_cell_states are just the sequence at the last level
-            
-            cell_outputs = outputs[0]
-            last_cell_states = states[0]
-
-            return cell_outputs, last_cell_states
+        # outputs and states are all lists of length `num_splits`
+        # outputs: list of [batch_size, sub-sequence length, num_units]
+        # states: list of tuple (fw_last_state, bw_last_state)
+        return outputs, states
