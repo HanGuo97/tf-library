@@ -130,6 +130,7 @@ class TempConvEncoder(base_models.BaseEncoder):
                  is_training=True):
         if not isinstance(kernel_sizes, (tuple, list)):
             raise ValueError("kernel_sizes must be a list")
+        logging_ops.warn("Scope is actually not used!!!")
 
         self._filters = filters
         self._kernel_sizes = kernel_sizes
@@ -256,7 +257,7 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
             with vs.variable_scope("hierarchical_encoder/level_%d" % i,
                                    reuse=vs.AUTO_REUSE) as scope:
                 
-                h_encoder = self._core_encoder_cls(**self._kargs)
+                h_encoder = self._core_encoder_cls(scope=scope, **self._kargs)
                 h_encoder.build()
 
             hierarchical_encoders.append(
