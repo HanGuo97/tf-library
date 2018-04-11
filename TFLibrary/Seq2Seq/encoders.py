@@ -5,18 +5,21 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow.python.ops import nn_ops
-from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import rnn as rnn_ops
 from tensorflow.python.ops import check_ops
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import rnn as rnn_ops
+from tensorflow.python.ops import variable_scope as vs
+
 from tensorflow.python.layers import convolutional
 from tensorflow.python.layers import normalization
 from tensorflow.python.layers import pooling
+
 from tensorflow.python.framework import dtypes
-from tensorflow.python.ops import variable_scope as vs
+from tensorflow.python.framework import tensor_util
+from tensorflow.python.framework import ops as framework_ops
 
 from tensorflow.python.platform import tf_logging as logging_ops
-from tensorflow.python.framework import ops as framework_ops
 
 from TFLibrary.Seq2Seq import base_models
 from TFLibrary.Seq2Seq import rnn_cell_utils
@@ -261,7 +264,8 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
                              Encoder=h_encoder,
                              Scope=scope))
 
-            logging_ops.info("Level %d splits: %d", i, num_splits)
+            logging_ops.info(
+                "Level %d \tsplits: %d \tlength %d", i, num_splits, l)
 
         self._hierarchical_encoders = hierarchical_encoders
 
@@ -282,6 +286,11 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
         Returns:
           embedding: A batch of embeddings, sized `[batch_size, N]`.
         """
+        if not tensor_util.is_tensor(sequence):
+            raise TypeError("`sequence` must be tf.Tensor")
+        if not tensor_util.is_tensor(sequence_length):
+            raise TypeError("`sequence_length` must be tf.Tensor")
+
         batch_size = sequence.shape[0].value
 
         # suppose sequence length = [100] * batch_size,
@@ -323,25 +332,41 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
             # list of [batch_size, num_units] with length num_splits
             split_lengths = array_ops.unstack(sequence_length, axis=1)
             
-            # list of [batch_size, num_units] with length num_splits
-            embeddings = [h_encoder.encode(s, l)
-                for s, l in zip(split_seqs, split_lengths)]
+            # list of cell outputs and cell states with length num_splits
+            outputs, states = zip(*[h_encoder.encode(s, l)
+                for s, l in zip(split_seqs, split_lengths)])
+
+            # to propagate into the next level
+            # we only need the last cell states from the current level
             
+            # we first extract the last h for each sub-sequence
+            # concatenate them if there are multiple h (e.g. bidirectional)
+            # then we stack them into the sequence_length dimention
+
+            # here we hard-code using bidirectional LSTM, and thus
+            last_states = lstm_utils.extract_and_concat_bidir_last_h(states)
+
             # back to [batch_size, num_splits, num_units]
-            sequence = array_ops.stack(embeddings, axis=1)
+            sequence = array_ops.stack(last_states, axis=1)
 
 
-        # I am commenting out below codes, since they were borrowed
-        # from Magenta's github, and assumes the final output to be
-        # a vector rather than sequence of vectors
+        # the last level must have sequence length 1
+        with framework_ops.control_dependencies(
+                [check_ops.assert_equal(
+                    array_ops.shape(sequence)[1], 1,
+                    message="Outputs of the last layer in "
+                            "hierarchical encoders as "
+                            "sequence_length == level_lengths[-1]")]):
 
-#         with framework_ops.control_dependencies(
-#                 [check_ops.assert_equal(
-#                     array_ops.shape(sequence)[1], 1,
-#                     message="Outputs of the last layer in "
-#                             "hierarchical encoders as "
-#                             "sequence_length == level_lengths[-1]")]):
-#             # the same as sequence[:, 0, :]
-#             return sequence[:, 0]
+            if len(outputs) != 1:
+                raise ValueError("outputs in the last level must be 1")
 
-        return sequence
+            # we return both cell_outputs and last_cell_states
+            # cell_outputs are the cell_outputs from the second last level
+            # (since the last level) will have sequence_length 1
+            # last_cell_states are just the sequence at the last level
+            
+            cell_outputs = outputs[0]
+            last_cell_states = states[0]
+
+            return cell_outputs, last_cell_states
