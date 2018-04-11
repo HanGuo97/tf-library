@@ -352,4 +352,8 @@ class HierarchicalLstmEncoder(base_models.BaseEncoder):
         # outputs and states are all lists of length `num_splits`
         # outputs: list of [batch_size, sub-sequence length, num_units]
         # states: list of tuple (fw_last_state, bw_last_state)
+
+        # Note that while it's helpful to also return states_concat
+        # it's better to keep the encoder.encode() function's interface
+        # consistent
         return outputs, states
