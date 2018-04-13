@@ -182,7 +182,7 @@ def infer(FLAGS):
         is_training=False)
 
     tf.logging.info("Running Evaluation")
-    infer_model.initialize_or_restore_session()
+    infer_model.initialize_or_restore_session(ckpt_file=FLAGS.infer_ckpt)
     infer_model.initialize_data_iterator()
     infer_model.evaluate()
 
@@ -206,8 +206,10 @@ def add_arguments():
                         type=int, default=100)
     parser.add_argument("--logdir",
                         type=str, default=None)
-    parser.add_argument("--inference",
+    parser.add_argument("--infer",
                         action="store_true", default=False)
+    parser.add_argument("--infer_ckpt",
+                        type=str, default=None)
     
     FLAGS, unparsed = parser.parse_known_args()
 
