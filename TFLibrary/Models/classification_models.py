@@ -153,15 +153,18 @@ class PairwiseClassificationModel(object):
                 predictions, labels = self.sample(include_labels=True)
                 accuracy = np.mean(predictions == labels)
                 accuracies.append(accuracy)
-                all_labels.append(labels)
-                all_predictions.append(all_predictions)
+
+                all_labels += labels.tolist()
+                all_predictions += predictions.tolist()
         
         except tf.errors.OutOfRangeError:
             avg_accuracy = np.mean(accuracies)
             tf.logging.info(
                 "Count: %d AvgAccuracy %.2f" %
                 (len(accuracies), avg_accuracy * 100))
-            tf.logging.info(classification_report(g_inds, p_inds, target_names=[str(l) for l in target_labels[task]]))
+            
+            tf.logging.info("\n" + classification_report(
+                y_true=all_labels, y_pred=all_predictions))
 
         self.write_summary("ValidationAccuracy", avg_accuracy)
         tf.logging.info("STEP %d ACR: %.3f" % (self.global_step, avg_accuracy))
