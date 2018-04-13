@@ -94,7 +94,7 @@ def build_model(data_batch,
         token_embedding_size=128,
         # optimization
         optimizer="SGD",
-        learning_rate=0.1,
+        learning_rate=0.5,
         gradient_clipping_norm=2.0,
         # misc
         graph=graph,
