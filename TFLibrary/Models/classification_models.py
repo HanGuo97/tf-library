@@ -4,6 +4,8 @@ import tensorflow as tf
 from TFLibrary.Seq2Seq import base_models
 from TFLibrary.utils import tensorflow_utils as tf_utils
 
+tf.logging.set_verbosity(tf.logging.INFO)
+
 
 class PairwiseClassificationModel(object):
     def __init__(self,
