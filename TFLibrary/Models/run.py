@@ -207,7 +207,7 @@ def add_arguments():
     parser.add_argument("--logdir",
                         type=str, default=None)
     parser.add_argument("--inference",
-                        type=str, default=None)
+                        action="store_true", default=False)
     
     FLAGS, unparsed = parser.parse_known_args()
 
