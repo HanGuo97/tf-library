@@ -145,7 +145,11 @@ def train(FLAGS):
     val_model.initialize_data_iterator()
 
     for _ in range(FLAGS.max_steps):
-        train_model.train()
+        try:
+            train_model.train()
+        except tf.errors.OutOfRangeError:
+            train_model.initialize_data_iterator()
+            continue
 
         if train_model.global_step % FLAGS.steps_per_eval == 0:
             train_model.save_session()
