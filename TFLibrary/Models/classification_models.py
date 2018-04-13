@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import tensorflow as tf
+from sklearn.metrics import classification_report
+
 from TFLibrary.Seq2Seq import base_models
 from TFLibrary.utils import tensorflow_utils as tf_utils
 
@@ -144,17 +146,22 @@ class PairwiseClassificationModel(object):
 
     def evaluate(self):
         accuracies = []
+        all_labels = []
+        all_predictions = []
         try:
             while True:
                 predictions, labels = self.sample(include_labels=True)
                 accuracy = np.mean(predictions == labels)
                 accuracies.append(accuracy)
+                all_labels.append(labels)
+                all_predictions.append(all_predictions)
         
         except tf.errors.OutOfRangeError:
             avg_accuracy = np.mean(accuracies)
             tf.logging.info(
                 "Count: %d AvgAccuracy %.2f" %
                 (len(accuracies), avg_accuracy * 100))
+            tf.logging.info(classification_report(g_inds, p_inds, target_names=[str(l) for l in target_labels[task]]))
 
         self.write_summary("ValidationAccuracy", avg_accuracy)
         tf.logging.info("STEP %d ACR: %.3f" % (self.global_step, avg_accuracy))

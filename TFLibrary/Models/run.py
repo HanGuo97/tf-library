@@ -91,17 +91,17 @@ def build_model(data_batch,
         data=data_batch,
         num_classes=label_vocab_size,
         token_vocab_size=token_vocab_size,
-        token_embedding_size=128,
+        token_embedding_size=64,
         # optimization
-        optimizer=tf.train.RMSPropOptimizer,
+        optimizer=tf.train.AdamOptimizer,
         learning_rate=0.001,
-        gradient_clipping_norm=5.0,
+        gradient_clipping_norm=2.0,
         # misc
         graph=graph,
         logdir=logdir,
         # encoder-specific
         unit_type="lstm",
-        num_units=128,
+        num_units=64,
         is_training=is_training)
     
     model.build()

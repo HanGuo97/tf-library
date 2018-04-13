@@ -1,4 +1,5 @@
 from collections import Counter
+from nltk.tokenize import word_tokenize
 
 
 def make_vocab(file_name, sequences, vocab_size=None):
@@ -37,10 +38,18 @@ def write_to_file(base_file_name, sequences_1, sequences_2, labels,
     """
     if not lower:
         raise NotImplementedError("Only Lower Case is supported")
+
+    def _sequence_prepro(seq):
+        # lower case
+        preproc_seq = seq.lower()
+        # tokenize and join by space
+        preproc_seq = " ".join(word_tokenize(preproc_seq))
+        return preproc_seq
+        
     
-    processed_seq_1 = list(map(str.lower, sequences_1))
-    processed_seq_2 = list(map(str.lower, sequences_2))
-    processed_labels = list(map(str.lower, labels))
+    processed_seq_1 = list(map(_sequence_prepro, sequences_1))
+    processed_seq_2 = list(map(_sequence_prepro, sequences_2))
+    processed_labels = list(map(_sequence_prepro, labels))
     
     with open(base_file_name + ".sequence_1", "w") as f:
         f.write("\n".join(processed_seq_1))

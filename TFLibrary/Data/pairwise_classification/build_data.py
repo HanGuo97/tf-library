@@ -16,21 +16,21 @@ def build_stance_data():
         num_instances=None)
 
     utils.write_to_file(
-        base_file_name="./DATA/TextClassifData/Misc/train",
+        base_file_name="./DATA/TextClassifData/SemEval2016Task6/train",
         sequences_1=data_train["seq1"],
         sequences_2=data_train["seq2"],
         labels=data_train["stance"],
         lower=True, verbose=True)
 
     utils.write_to_file(
-        base_file_name="./DATA/TextClassifData/Misc/val",
+        base_file_name="./DATA/TextClassifData/SemEval2016Task6/val",
         sequences_1=data_dev["seq1"],
         sequences_2=data_dev["seq2"],
         labels=data_dev["stance"],
         lower=True, verbose=True)
 
     utils.write_to_file(
-        base_file_name="./DATA/TextClassifData/Misc/test",
+        base_file_name="./DATA/TextClassifData/SemEval2016Task6/test",
         sequences_1=data_test["seq1"],
         sequences_2=data_test["seq2"],
         labels=data_test["stance"],
