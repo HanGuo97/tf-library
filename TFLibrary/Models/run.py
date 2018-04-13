@@ -102,6 +102,7 @@ def build_model(data_batch,
         # encoder-specific
         unit_type="lstm",
         num_units=128,
+        dropout_rate=0.5,
         is_training=is_training)
     
     model.build()
