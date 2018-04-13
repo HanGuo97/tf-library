@@ -21,7 +21,7 @@ class PairwiseClassificationModel(object):
                  # misc
                  graph=None,
                  logdir=None,
-                 debug_mode=True,
+                 debug_mode=False,
                  # encoder args
                  **encoder_kargs):
 
@@ -152,7 +152,9 @@ class PairwiseClassificationModel(object):
         
         except tf.errors.OutOfRangeError:
             avg_accuracy = np.mean(accuracies)
-            tf.logging.info("avg_accuracy %.2f" % (avg_accuracy * 100))
+            tf.logging.info(
+                "Count: %d AvgAccuracy %.2f" %
+                (len(accuracies), avg_accuracy * 100))
 
         self.write_summary("ValidationAccuracy", avg_accuracy)
         tf.logging.info("STEP %d ACR: %.3f" % (self.global_step, avg_accuracy))
@@ -231,7 +233,7 @@ class PairwiseClassificationModel(object):
         
         if self._debug_mode:
             labels = tf.Print(labels, [labels],
-                "Squeezed Labels", summarize=10)
+                              "Labels", summarize=10)
         
         cross_entropy = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(

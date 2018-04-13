@@ -140,9 +140,7 @@ def train(FLAGS):
         is_training=False)
 
     train_model.initialize_or_restore_session()
-    val_model.initialize_or_restore_session()
     train_model.initialize_data_iterator()
-    val_model.initialize_data_iterator()
 
     for _ in range(FLAGS.max_steps):
         try:
@@ -153,12 +151,40 @@ def train(FLAGS):
 
         if train_model.global_step % FLAGS.steps_per_eval == 0:
             train_model.save_session()
-            # val-set have much bigger batch-size
-            # so just run this for one step is fine
             tf.logging.info("Running Evaluation")
             val_model.initialize_or_restore_session()
             val_model.initialize_data_iterator()
             val_model.evaluate()
+
+
+def infer(FLAGS):
+    # use val as infer
+    train_graph = tf.Graph()
+    infer_graph = tf.Graph()
+    
+    (_,
+     infer_batch,
+     token_vocab_size,
+     label_vocab_size) = build_data(
+        train_file=FLAGS.train_file,
+        val_file=FLAGS.val_file,
+        train_batch_size=FLAGS.train_batch_size,
+        val_batch_size=FLAGS.val_batch_size,
+        train_graph=train_graph,
+        val_graph=infer_graph)
+
+    infer_model = build_model(
+        data_batch=infer_batch,
+        token_vocab_size=token_vocab_size,
+        label_vocab_size=label_vocab_size,
+        graph=infer_graph,
+        logdir=FLAGS.logdir,
+        is_training=False)
+
+    tf.logging.info("Running Evaluation")
+    infer_model.initialize_or_restore_session()
+    infer_model.initialize_data_iterator()
+    infer_model.evaluate()
 
 
 def add_arguments():
@@ -168,18 +194,23 @@ def add_arguments():
                         type=str, default=None)
     parser.add_argument("--val_file",
                         type=str, default=None)
+
     parser.add_argument("--train_batch_size",
                         type=int, default=256)
     parser.add_argument("--val_batch_size",
                         type=int, default=1000)
+
     parser.add_argument("--max_steps",
                         type=int, default=5000)
     parser.add_argument("--steps_per_eval",
                         type=int, default=100)
     parser.add_argument("--logdir",
                         type=str, default=None)
+    parser.add_argument("--inference",
+                        type=str, default=None)
     
     FLAGS, unparsed = parser.parse_known_args()
+
     return FLAGS
 
 
