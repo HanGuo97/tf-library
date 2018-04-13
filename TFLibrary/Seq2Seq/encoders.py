@@ -1,4 +1,4 @@
-"""LSTM-based encoders and decoders for MusicVAE."""
+"""LSTM-based encoders and decoders."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -42,7 +42,8 @@ class LstmEncoder(base_models.BaseEncoder):
                  num_residual_layers=0,
                  scope="LstmEncoder",
                  is_training=True,  # only for dropout
-                 bidirectional=True):
+                 bidirectional=True,
+                 **encoder_kargs):
 
         self._encoder_scope = scope
         self._is_training = is_training
@@ -53,6 +54,15 @@ class LstmEncoder(base_models.BaseEncoder):
         self._num_layers = num_layers
         self._dropout_rate = dropout_rate
         self._num_residual_layers = num_residual_layers
+
+        self._encoder_kargs = encoder_kargs
+        
+        if encoder_kargs:
+            print("Additional RNN Cell Arguments: \n")
+            addi_info = ["\t\t\t %s \t %s " % (k, v)
+                         for k, v in encoder_kargs]
+            print("\n".join(addi_info))
+
 
     def build(self):
         mode = "train" if self._is_training else "inference"
@@ -66,7 +76,8 @@ class LstmEncoder(base_models.BaseEncoder):
                 dropout=self._dropout_rate,
                 num_residual_layers=self._num_residual_layers,
                 # use default cell creator
-                single_cell_fn=None)
+                single_cell_fn=None,
+                **self._encoder_kargs)
 
             self._bw_cell = rnn_cell_utils.create_rnn_cell(
                 unit_type=self._unit_type,
@@ -76,7 +87,8 @@ class LstmEncoder(base_models.BaseEncoder):
                 dropout=self._dropout_rate,
                 num_residual_layers=self._num_residual_layers,
                 # use default cell creator
-                single_cell_fn=None)
+                single_cell_fn=None,
+                **self._encoder_kargs)
 
         else:
             self._cell = rnn_cell_utils.create_rnn_cell(
@@ -87,7 +99,8 @@ class LstmEncoder(base_models.BaseEncoder):
                 dropout=self._dropout_rate,
                 num_residual_layers=self._num_residual_layers,
                 # use default cell creator
-                single_cell_fn=None)
+                single_cell_fn=None,
+                **self._encoder_kargs)
 
     def encode(self, inputs, sequence_length=None, initial_state=None):
         if self._bidirectional:

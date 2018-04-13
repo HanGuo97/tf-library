@@ -24,7 +24,8 @@ def _single_cell(unit_type,
             num_units, *args, **kargs)
 
     elif unit_type == "layer_norm_lstm":
-        single_cell = tf.nn.rnn_cell.LayerNormBasicLSTMCell(
+        # dropout_keep_prob
+        single_cell = tf.contrib.rnn.LayerNormBasicLSTMCell(
             num_units, layer_norm=True, *args, **kargs)
 
     elif unit_type == "classical_lstm":

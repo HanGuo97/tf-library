@@ -211,7 +211,7 @@ class PairwiseClassificationModel(object):
                 [sequence_lengths_1, sequence_lengths_2])):
 
             with tf.variable_scope("Encoder_%d" % i) as scope:
-
+                tf.logging.info("Creating ", self._encoder_cls.__name__)
                 encoder = self._encoder_cls(**self._encoder_kargs)
                 encoder.build()
                 outputs, states = encoder.encode(

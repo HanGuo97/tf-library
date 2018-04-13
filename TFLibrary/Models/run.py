@@ -85,7 +85,9 @@ def build_model(data_batch,
                 graph,
                 logdir,
                 is_training):
-    
+    # no dropout during test
+    # layer_norm_lstm specific
+    recurrent_dropout = 0.5 if is_training else 1.0
     model = classification_models.PairwiseClassificationModel(
         encoder_cls=encoders.LstmEncoder,
         data=data_batch,
@@ -100,9 +102,9 @@ def build_model(data_batch,
         graph=graph,
         logdir=logdir,
         # encoder-specific
-        unit_type="lstm",
+        unit_type="layer_norm_lstm",
         num_units=128,
-        dropout_rate=0.5,
+        dropout_keep_prob=recurrent_dropout,
         is_training=is_training)
     
     model.build()
