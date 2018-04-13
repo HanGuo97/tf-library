@@ -66,7 +66,7 @@ class PairwiseClassificationModel(object):
              predictions,
              global_step_tensor) = self._build_loss(
                 logits=logits,
-                labels=self._data.labels,
+                labels=self._data.target,
                 sequence_lengths=self._data.sequence_lengths)
 
             summary_ops = tf.summary.merge_all()
@@ -126,7 +126,7 @@ class PairwiseClassificationModel(object):
     def sample(self, include_labels=False):
         if include_labels:
             labels, predictions, global_step = self._sess.run(
-                [self._data.labels,
+                [self._data.target,
                  self._predictions,
                  self._global_step_tensor])
         else:
