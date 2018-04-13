@@ -1,13 +1,13 @@
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+
 import argparse
 import tensorflow as tf
 from tensorflow.python.ops import lookup_ops
 from TFLibrary.Seq2Seq import encoders
 from TFLibrary.Data.utils import iterator_utils
 from TFLibrary.Models import classification_model
-
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
 
 
 def build_data(train_file, val_file,
