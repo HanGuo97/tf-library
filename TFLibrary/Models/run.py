@@ -217,7 +217,11 @@ def add_arguments():
 def main(unused_argv):
     tf.set_random_seed(111)
     FLAGS = add_arguments()
-    train(FLAGS)
+
+    if FLAGS.inference:
+        infer(FLAGS)
+    else:
+        train(FLAGS)
 
 
 if __name__ == '__main__':
