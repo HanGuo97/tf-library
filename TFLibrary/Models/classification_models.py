@@ -94,6 +94,7 @@ class PairwiseClassificationModel(object):
                 config=tf_utils.get_config())
 
             if initialize:
+                self._sess.run(tf.tables_initializer())
                 self._sess.run(tf.global_variables_initializer())
 
             if self._logdir or ckpt_file:
