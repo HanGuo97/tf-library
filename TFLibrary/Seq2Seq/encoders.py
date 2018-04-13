@@ -60,7 +60,7 @@ class LstmEncoder(base_models.BaseEncoder):
         if encoder_kargs:
             print("Additional RNN Cell Arguments: \n")
             addi_info = ["\t\t\t %s \t %s " % (k, v)
-                         for k, v in encoder_kargs]
+                         for k, v in encoder_kargs.items()]
             print("\n".join(addi_info))
 
 
