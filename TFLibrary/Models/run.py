@@ -91,7 +91,7 @@ def build_model(data_batch,
         data=data_batch,
         num_classes=label_vocab_size,
         token_vocab_size=token_vocab_size,
-        token_embedding_size=64,
+        token_embedding_size=128,
         # optimization
         optimizer=tf.train.AdamOptimizer,
         learning_rate=0.001,
@@ -101,7 +101,7 @@ def build_model(data_batch,
         logdir=logdir,
         # encoder-specific
         unit_type="lstm",
-        num_units=64,
+        num_units=128,
         is_training=is_training)
     
     model.build()
