@@ -7,7 +7,7 @@ import tensorflow as tf
 from tensorflow.python.ops import lookup_ops
 from TFLibrary.Seq2Seq import encoders
 from TFLibrary.Data.utils import iterator_utils
-from TFLibrary.Models import classification_model
+from TFLibrary.Models import classification_models
 
 
 def build_data(train_file, val_file,
@@ -75,7 +75,7 @@ def build_model(data_batch,
                 logdir,
                 is_training):
     
-    model = classification_model.PairwiseClassificationModel(
+    model = classification_models.PairwiseClassificationModel(
         encoder_cls=encoders.LstmEncoder,
         data=data_batch,
         num_classes=label_vocab_size,
