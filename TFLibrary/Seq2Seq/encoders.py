@@ -62,6 +62,7 @@ class LstmEncoder(base_models.BaseEncoder):
             addi_info = ["\t\t\t %s \t %s " % (k, v)
                          for k, v in encoder_kargs.items()]
             print("\n".join(addi_info))
+            print("END")
 
 
     def build(self):
