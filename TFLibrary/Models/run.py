@@ -96,7 +96,7 @@ def build_model(data_batch,
         token_embedding_size=128,
         # optimization
         optimizer=tf.train.AdamOptimizer,
-        learning_rate=0.0001,
+        learning_rate=0.001,
         gradient_clipping_norm=2.0,
         # misc
         graph=graph,
