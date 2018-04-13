@@ -114,20 +114,18 @@ def train(FLAGS):
 
     train_model = build_model(
         data_batch=train_batch,
-        graph=train_graph,
         token_vocab_size=token_vocab_size,
         label_vocab_size=label_vocab_size,
+        graph=train_graph,
         logdir=FLAGS.logdir,
-        which_model=FLAGS.model,
         is_training=True)
 
     val_model = build_model(
         data_batch=val_batch,
-        graph=val_graph,
         token_vocab_size=token_vocab_size,
         label_vocab_size=label_vocab_size,
+        graph=val_graph,
         logdir=FLAGS.logdir,
-        which_model=FLAGS.model,
         is_training=False)
 
     train_model.initialize_or_restore_session()
@@ -151,7 +149,9 @@ def train(FLAGS):
 def add_arguments():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_file",
+    parser.add_argument("--train_file",
+                        type=str, default=None)
+    parser.add_argument("--val_file",
                         type=str, default=None)
     parser.add_argument("--train_batch_size",
                         type=int, default=256)
@@ -162,8 +162,6 @@ def add_arguments():
     parser.add_argument("--steps_per_eval",
                         type=int, default=100)
     parser.add_argument("--logdir",
-                        type=str, default=None)
-    parser.add_argument("--model",
                         type=str, default=None)
     
     FLAGS, unparsed = parser.parse_known_args()
