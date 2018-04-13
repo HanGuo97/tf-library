@@ -15,10 +15,12 @@ def build_data(train_file, val_file,
                train_graph, val_graph):
     # get the UNK ID = Vocab Size + 1
     # but since Python is 0-based, UNK-ID = Vocab Size
+    # and thus the new vocab size = old vocab size + 1
     with open(train_file + ".source_vocab") as f:
         _src_vocab = [d.strip() for d in f.readlines()]
-        token_vocab_size = unk_id = len(_src_vocab)
-        print("token_vocab_size is %d" % token_vocab_size)
+        unk_id = len(_src_vocab)
+        token_vocab_size = len(_src_vocab) + 1
+        print("token_vocab_size is %d, UNK is %d" % (token_vocab_size, unk_id))
 
     # label vocab size == num_classes
     with open(train_file + ".label_vocab") as f:
