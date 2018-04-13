@@ -27,16 +27,16 @@ def build_data(train_file, val_file,
         print("label_vocab_size is %d" % label_vocab_size)
 
 
-    # vocabs are stricted to train vocabs
-    src_vocab_file = train_file + ".source_vocab"
-    tgt_vocab_file = train_file + ".label_vocab"
-    src_vocab_table = lookup_ops.index_table_from_file(
-        src_vocab_file, default_value=unk_id)
-    # no UNKs in target labels
-    tgt_vocab_table = lookup_ops.index_table_from_file(tgt_vocab_file)
-
     # train dataset
     with train_graph.as_default():
+        # vocabs are stricted to train vocabs
+        src_vocab_file = train_file + ".source_vocab"
+        tgt_vocab_file = train_file + ".label_vocab"
+        src_vocab_table = lookup_ops.index_table_from_file(
+            src_vocab_file, default_value=unk_id)
+        # no UNKs in target labels
+        tgt_vocab_table = lookup_ops.index_table_from_file(tgt_vocab_file)
+
         train_src_1 = tf.data.TextLineDataset(train_file + ".sequence_1")
         train_src_2 = tf.data.TextLineDataset(train_file + ".sequence_2")
         train_tgt = tf.data.TextLineDataset(train_file + ".labels")
@@ -52,6 +52,15 @@ def build_data(train_file, val_file,
 
     # val dataset
     with val_graph.as_default():
+        # since these are graph-specific, we build them twice
+        # vocabs are stricted to train vocabs
+        src_vocab_file = train_file + ".source_vocab"
+        tgt_vocab_file = train_file + ".label_vocab"
+        src_vocab_table = lookup_ops.index_table_from_file(
+            src_vocab_file, default_value=unk_id)
+        # no UNKs in target labels
+        tgt_vocab_table = lookup_ops.index_table_from_file(tgt_vocab_file)
+
         val_src_1 = tf.data.TextLineDataset(val_file + ".sequence_1")
         val_src_2 = tf.data.TextLineDataset(val_file + ".sequence_2")
         val_tgt = tf.data.TextLineDataset(val_file + ".labels")
