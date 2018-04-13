@@ -93,8 +93,8 @@ def build_model(data_batch,
         token_vocab_size=token_vocab_size,
         token_embedding_size=128,
         # optimization
-        optimizer=tf.train.RMSPropOptimizer,
-        learning_rate=0.001,
+        optimizer=tf.train.AdamOptimizer,
+        learning_rate=0.0001,
         gradient_clipping_norm=2.0,
         # misc
         graph=graph,
