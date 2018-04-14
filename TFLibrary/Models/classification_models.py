@@ -233,12 +233,14 @@ class PairwiseClassificationModel(object):
                 all_encoders.append(encoder)
                 all_processed_outputs.append(processed_outputs)
 
+
         # [u, v, |u - v|, u * v]
         u = all_processed_outputs[0]
         v = all_processed_outputs[1]
         u_mul_v = tf.multiply(u, v)
         u_min_v = tf.abs(tf.subtract(u, v))
         features = tf.concat([u, v, u_min_v, u_mul_v], axis=-1)
+        tf.logging.info("Using [u, v, |u - v|, u * v] as features")
 
         # final linear layer
         logits = tf.layers.dense(
