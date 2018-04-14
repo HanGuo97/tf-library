@@ -232,7 +232,9 @@ class PairwiseClassificationModel(object):
                 all_scopes.append(scope)
                 all_encoders.append(encoder)
                 all_processed_outputs.append(processed_outputs)
-
+        
+        if len(all_processed_outputs) != 2:
+            tf.logging.fatal("all_processed_outputs.len != 2")
 
         # [u, v, |u - v|, u * v]
         u = all_processed_outputs[0]

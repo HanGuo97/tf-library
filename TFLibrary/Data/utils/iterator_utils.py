@@ -20,7 +20,8 @@ def get_pairwise_classification_iterator(
         src_vocab_table,
         tgt_vocab_table,
         batch_size,
-        padding_id,
+        sos,
+        eos,
         random_seed,
         src_max_len=None,
         num_parallel_calls=4,
@@ -32,6 +33,9 @@ def get_pairwise_classification_iterator(
 
     if not output_buffer_size:
         output_buffer_size = batch_size * 1000
+
+    eos_id = tf.cast(src_vocab_table.lookup(tf.constant(eos)), tf.int32)
+    sos_id = tf.cast(tgt_vocab_table.lookup(tf.constant(sos)), tf.int32)
 
     src_tgt_dataset = tf.data.Dataset.zip(
         (src_dataset_1, src_dataset_2, tgt_dataset))
@@ -59,6 +63,7 @@ def get_pairwise_classification_iterator(
                                tf.size(src_2) > 0),
                 tf.size(tgt) > 0)))
 
+    # not target max len because this is classification
     if src_max_len:
         src_tgt_dataset = src_tgt_dataset.map(
             lambda src_1, src_2, tgt: (
@@ -66,7 +71,7 @@ def get_pairwise_classification_iterator(
             num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
 
 
-    # Convert the word strings to ids.  Word strings that are not in the
+    # Convert the word strings to ids. Word strings that are not in the
     # vocab get the lookup table's default_value integer.
     src_tgt_dataset = src_tgt_dataset.map(
         lambda src_1, src_2, tgt: (
@@ -75,7 +80,14 @@ def get_pairwise_classification_iterator(
             tf.cast(tgt_vocab_table.lookup(tgt), tf.int32)),
         num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
 
-    
+
+    # Create sources prefixed with <sos> and suffixed with <eos>.
+    src_tgt_dataset = src_tgt_dataset.map(
+        lambda src_1, src_2, tgt: (
+            tf.concat(([sos_id], src_1, [eos_id]), 0),
+            tf.concat(([sos_id], src_2, [eos_id]), 0),
+            tgt),
+        num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
     
     # Add in sequence lengths.
     # target lengths are redundant, but kept
@@ -105,8 +117,8 @@ def get_pairwise_classification_iterator(
             # later on we will be masking out calculations past the true
             # sequence.
             padding_values=(
-                padding_id,  # src_1
-                padding_id,  # src_2
+                eos_id,  # src_1
+                eos_id,  # src_2
                 0,  # tgt -- unused
                 0,  # src_1_len -- unused
                 0,  # src_2_len -- unused
