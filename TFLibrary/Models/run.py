@@ -93,17 +93,17 @@ def build_model(data_batch,
         data=data_batch,
         num_classes=label_vocab_size,
         token_vocab_size=token_vocab_size,
-        token_embedding_size=128,
+        token_embedding_size=256,
         # optimization
-        optimizer="SGD",
-        learning_rate=0.5,
+        optimizer="Adam",
+        learning_rate=0.005,
         gradient_clipping_norm=2.0,
         # misc
         graph=graph,
         logdir=logdir,
         # encoder-specific
         unit_type="lstm",
-        num_units=128,
+        num_units=256,
         dropout_rate=0.5,
         is_training=is_training)
     
