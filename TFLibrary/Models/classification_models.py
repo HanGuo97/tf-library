@@ -202,6 +202,10 @@ class PairwiseClassificationModel(object):
                        encoder_inputs_2,
                        sequence_lengths_1,
                        sequence_lengths_2):
+        """
+        BiLSTM with max pooling from
+        https://arxiv.org/pdf/1705.02364.pdf
+        """
         
         all_scopes = []
         all_encoders = []
@@ -214,22 +218,31 @@ class PairwiseClassificationModel(object):
                 tf.logging.info("Creating %s" % self._encoder_cls.__name__)
                 encoder = self._encoder_cls(**self._encoder_kargs)
                 encoder.build()
+
+                # here we hard-coded the use of bidir-LSTM
+                # outputs: [batch_size, length, num_units x 2]
                 outputs, states = encoder.encode(
                     inputs=enc_inp, sequence_length=seq_len)
 
-                # use last states' h
-                # here we hard-coded the use of bidir-LSTM
-                # [batch_size, num_units x 2]
-                processed_outputs = tf.concat([s.h for s in states], axis=-1)
+                # row-level max-pooling
+                # processed_outputs: [batch_size, num_units x 2]
+                processed_outputs = tf.reduce_max(outputs, axis=1)
 
                 # append the outputs
                 all_scopes.append(scope)
                 all_encoders.append(encoder)
                 all_processed_outputs.append(processed_outputs)
-        
-        
+
+        # [u, v, |u - v|, u * v]
+        u = all_processed_outputs[0]
+        v = all_processed_outputs[1]
+        u_mul_v = tf.multiply(u, v)
+        u_min_v = tf.abs(tf.subtract(u, v))
+        features = tf.concat([u, v, u_min_v, u_mul_v], axis=-1)
+
+        # final linear layer
         logits = tf.layers.dense(
-            inputs=tf.concat(all_processed_outputs, axis=-1),
+            inputs=features,
             units=self._num_classes)
 
         # store the encoder for debugging
