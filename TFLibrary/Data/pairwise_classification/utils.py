@@ -1,3 +1,4 @@
+from warnings import warn
 from collections import Counter
 from nltk.tokenize import word_tokenize
 
@@ -41,6 +42,10 @@ def write_to_file(base_file_name, sequences_1, sequences_2, labels,
 
     def _sequence_prepro(seq):
         # lower case
+        if not isinstance(seq, (str)):
+            warn("`seq` is not string, but %s" % type(seq))
+            seq = str(seq)
+
         preproc_seq = seq.lower()
         # tokenize and join by space
         preproc_seq = " ".join(word_tokenize(preproc_seq))

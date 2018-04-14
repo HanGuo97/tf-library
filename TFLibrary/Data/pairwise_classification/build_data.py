@@ -44,13 +44,17 @@ def build_data(datafolder=DataFolder,
         # sorry for hard-coding this
         # original names are like: semeval2016-task6-stance
         # and we process them to be Semeval2016Task6Stance
-        task_name = "".join([t.upper() for t in task.split("-")])
+        task_name = "".join([t.title() for t in task.split("-")])
         # /base/Semeval2016Task6Stance
-        task_folder_name = os.path.join([base_folder_name, task_name])
+        task_folder_name = os.path.join(base_folder_name, task_name)
         # /base/Semeval2016Task6Stance/train
-        _get_base_file_name = lambda m: os.path.join([task_folder_name, m])
+        _get_base_file_name = lambda m: os.path.join(task_folder_name, m)
 
-        read_data = task2data_reader(STANCE)
+        if not os.path.isdir(task_folder_name):
+            os.makedirs(task_folder_name)
+            print("%s does not exist, created it" % task_folder_name)
+
+        read_data = task2data_reader(task)
         data_train, data_dev, data_test = read_data(
             datafolder=DataFolder,
             debug=False,
@@ -61,18 +65,18 @@ def build_data(datafolder=DataFolder,
             sequences_1=data_train["seq1"],
             sequences_2=data_train["seq2"],
             labels=data_train["stance"],
-            lower=True, verbose=True)
+            lower=True, verbose=False)
 
         utils.write_to_file(
             base_file_name=_get_base_file_name("val"),
             sequences_1=data_dev["seq1"],
             sequences_2=data_dev["seq2"],
             labels=data_dev["stance"],
-            lower=True, verbose=True)
+            lower=True, verbose=False)
 
         utils.write_to_file(
             base_file_name=_get_base_file_name("test"),
             sequences_1=data_test["seq1"],
             sequences_2=data_test["seq2"],
             labels=data_test["stance"],
-            lower=True, verbose=True)
+            lower=True, verbose=False)
