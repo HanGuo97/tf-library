@@ -1,7 +1,10 @@
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+
 import os
-import numpy as np
+import collections
 import tensorflow as tf
-from sklearn.metrics import classification_report
 
 from TFLibrary.Seq2Seq import base_models
 from TFLibrary.utils import tensorflow_utils as tf_utils
@@ -16,6 +19,8 @@ class PairwiseClassificationModel(object):
                  num_classes,
                  token_vocab_size,
                  token_embedding_size,
+                 # evaluation
+                 evaluation_fn,
                  # optimization
                  optimizer="SGD",
                  learning_rate=0.001,
@@ -26,17 +31,70 @@ class PairwiseClassificationModel(object):
                  debug_mode=False,
                  # encoder args
                  **encoder_kargs):
+        """
+        Classification model that does the mapping of
+
+            f: Seq_1 x Seq_2 --> Class
+
+        Args:
+            encoder_cls:
+                TFLibrary.Seq2Seq.base_models.BaseEncoder
+                The class to encoder individual sequences
+            data:
+                TFLibrary.Data.utils.iterator_utils.BatchedInput
+                Namedtuple containing tf.data.Dataset elements
+            num_classes:
+                Integer
+                number of possible classes
+            token_vocab_size:
+                Integer
+                vocabulary size for sequences
+            token_embedding_size:
+                Integer
+                embedding size of tokens
+            evaluation_fn:
+                Callable([Prediction], [Seq_1], [Seq_2], [Target]) --> Integer
+                a function that takes list of outputs and inputs, and return
+                a float of model performances
+            optimizer:
+                String or tf.train.Optimizer
+                optimizer to be used
+            learning_rate:
+                Float
+                learning rate
+            gradient_clipping_norm:
+                Float
+                gradient clipping norm
+            graph:
+                tf.Graph
+                Graph object used to construct the model, defaults
+                to creating a new graph
+            logdir:
+                String
+                directory to save model checkpoints and summaries
+            debug_mode:
+                Boolean
+                whether to print out some additional information
+
+            **encoder_kargs
+                additional arguments passed to `encoder_cls`
+
+        """
 
         if not issubclass(encoder_cls, base_models.BaseEncoder):
             raise TypeError(
                 "Expected `core_encoder_cls` to be "
                 "a subclass of base_models.BaseEncoder")
+        if not callable(evaluation_fn):
+            raise TypeError("`evaluation_fn` should be a callable function")
         
         self._encoder_cls = encoder_cls
         self._data = data
         self._num_classes = num_classes
         self._token_vocab_size = token_vocab_size
         self._token_embedding_size = token_embedding_size
+
+        self._evaluation_fn = evaluation_fn
 
         self._optimizer = optimizer
         self._learning_rate = learning_rate
@@ -127,48 +185,83 @@ class PairwiseClassificationModel(object):
         tf.logging.info("STEP %d LOSS: %.3f" % (self.global_step, loss))
         return loss
 
-    def sample(self, include_labels=False):
-        if include_labels:
-            labels, predictions, global_step = self._sess.run(
-                [self._data.target,
+    def sample(self, include_data=False):
+        """
+        Fetch model outputs
+
+        Returns:
+            predictions:
+                list: [batch size]
+                outputs of model predictions
+            fetched_data:
+                tuple: [source_1, source_2, target]
+                eachi of which is a list: [batch_size]
+                input data that makes the predictions
+        """
+        if include_data:
+            (source_1,
+             source_2,
+             target,
+             predictions,
+             global_step) = self._sess.run(
+                [self._data.source_1,
+                 self._data.source_2,
+                 self._data.target,
                  self._predictions,
                  self._global_step_tensor])
+
+            predictions = predictions.tolist()
+            fetched_data = (source_1.tolist(),
+                            source_2.tolist(),
+                            target.tolist())
+
         else:
-            labels = None
+            fetched_data = None
             predictions, global_step = self._sess.run(
                 [self._predictions,
                  self._global_step_tensor])
 
+            predictions = predictions.tolist()
+
         # update latest global step
         self.global_step = global_step
 
-        return predictions, labels
+        return predictions, fetched_data
 
     def evaluate(self):
-        accuracies = []
-        all_labels = []
+        """Sample from model predictions, and evaluate outputs"""
+        # predictions from the model
         all_predictions = []
+        # fetched data that led to the predictions
+        # dictionary of {seq_1: [], seq_2: [], target: []}
+        all_fetched_data = collections.defaultdict(list)
         try:
             while True:
-                predictions, labels = self.sample(include_labels=True)
-                accuracy = np.mean(predictions == labels)
-                accuracies.append(accuracy)
-
-                all_labels += labels.tolist()
-                all_predictions += predictions.tolist()
+                # sample predictions
+                predictions, fetched_data = self.sample(True)
+                # cache the data
+                all_predictions += predictions
+                all_fetched_data["seq_1"].append(fetched_data[0])
+                all_fetched_data["seq_2"].append(fetched_data[1])
+                all_fetched_data["target"].append(fetched_data[2])
         
         except tf.errors.OutOfRangeError:
-            avg_accuracy = np.mean(accuracies)
-            tf.logging.info(
-                "Count: %d AvgAccuracy %.2f" %
-                (len(accuracies), avg_accuracy * 100))
+            # evaluate
+            counts = len(all_predictions)
+            scores = self._evaluation_fn(
+                all_predictions,
+                all_fetched_data["seq_1"],
+                all_fetched_data["seq_2"],
+                all_fetched_data["target"])
             
-            tf.logging.info("\n" + classification_report(
-                y_true=all_labels, y_pred=all_predictions))
-
-        self.write_summary("ValidationAccuracy", avg_accuracy)
-        tf.logging.info("STEP %d ACR: %.3f" % (self.global_step, avg_accuracy))
-        return avg_accuracy
+            
+        self.write_summary("ValScores", scores)
+        tf.logging.info(
+            "Validation Reports: \n"
+            "\t\tSTEP %d\n\t\tCOUNT: %d\n\t\tScores %.2f"
+            % (self.global_step, counts, scores))
+        
+        return scores
 
     def save_session(self):
         self._saver.save(self._sess,
