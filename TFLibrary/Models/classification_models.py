@@ -53,7 +53,7 @@ class PairwiseClassificationModel(object):
                 Integer
                 embedding size of tokens
             evaluation_fn:
-                Callable([Prediction], [Seq_1], [Seq_2], [Target]) --> Integer
+                Callable([Prediction], [Seq_1], [Seq_2], [Target]) --> Float
                 a function that takes list of outputs and inputs, and return
                 a float of model performances
             optimizer:
