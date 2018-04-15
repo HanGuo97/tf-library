@@ -241,9 +241,9 @@ class PairwiseClassificationModel(object):
                 predictions, fetched_data = self.sample(True)
                 # cache the data
                 all_predictions += predictions
-                all_fetched_data["seq_1"].append(fetched_data[0])
-                all_fetched_data["seq_2"].append(fetched_data[1])
-                all_fetched_data["target"].append(fetched_data[2])
+                all_fetched_data["seq_1"] += fetched_data[0]
+                all_fetched_data["seq_2"] += fetched_data[1]
+                all_fetched_data["target"] += fetched_data[2]
         
         except tf.errors.OutOfRangeError:
             # evaluate
