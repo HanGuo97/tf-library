@@ -55,7 +55,7 @@ class TrainingManager(object):
     """
 
     def __init__(self, name, logdir,
-                 stopping_fn=_early_stop_with_tolerance(5),
+                 stopping_fn=_early_stop_with_tolerance(2),
                  updating_fn=_greedy_update(),
                  load_when_possible=True):
         """
