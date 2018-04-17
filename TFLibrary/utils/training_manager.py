@@ -156,7 +156,7 @@ class TrainingManager(object):
         print("TrainingManager INFO:\n",
               "BestValue: %.2f\n" % training_log.BestValue,
               "ValueHistory: %s\n" % training_log.ValueHistory[:-3],
-              "BestCheckpoint: %.2f\n" % training_log.BestCheckpoint)
+              "BestCheckpoint: %s\n" % training_log.BestCheckpoint)
 
     def save(self):
         hparams_utils.save_hparams(
