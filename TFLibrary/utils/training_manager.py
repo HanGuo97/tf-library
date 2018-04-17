@@ -155,7 +155,8 @@ class TrainingManager(object):
         training_log = self.get_training_log(self._name)
         print("TrainingManager INFO:\n",
               "BestValue: %.2f\n" % training_log.BestValue,
-              "ValueHistory: %s\n" % training_log.ValueHistory[-3:],
+              "ValueHistory: %s\n" % [round(v, 3)
+                for v in training_log.ValueHistory[-3:]],
               "BestCheckpoint: %s\n" % training_log.BestCheckpoint)
 
     def save(self):
