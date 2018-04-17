@@ -125,7 +125,7 @@ class TrainingManager(object):
         history = training_log.ValueHistory
         return self._stopping_fn(best_value, history)
 
-    def update(self, value, ckpt):
+    def update(self, value, ckpt, verbose=False):
         training_log = self.get_training_log(self._name)
         best_value = training_log.BestValue
         history = training_log.ValueHistory
@@ -147,6 +147,16 @@ class TrainingManager(object):
         self.set_training_log(
             key=self._name,
             value=new_training_log)
+
+        if verbose:
+            self.print_info()
+
+    def print_info(self):
+        training_log = self.get_training_log(self._name)
+        print("TrainingManager INFO:\n",
+              "BestValue: %.2f\n" % training_log.BestValue,
+              "ValueHistory: %.2f\n" % training_log.ValueHistory[:-3],
+              "BestCheckpoint: %.2f\n" % training_log.BestCheckpoint)
 
     def save(self):
         hparams_utils.save_hparams(
