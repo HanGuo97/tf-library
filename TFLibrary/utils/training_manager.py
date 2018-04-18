@@ -80,9 +80,9 @@ class TrainingManager(object):
                 Common choices include:
                     lambda best, history, value: value > best
         """
-        if not callable(stopping_fn):
+        if stopping_fn and not callable(stopping_fn):
             raise TypeError("`stopping_fn` should be callable")
-        if not callable(updating_fn):
+        if updating_fn and not callable(updating_fn):
             raise TypeError("`updating_fn` should be callable")
         
         # create log file
@@ -154,7 +154,7 @@ class TrainingManager(object):
     def print_info(self):
         training_log = self.get_training_log(self._name)
         print("TrainingManager INFO:\n",
-              "BestValue: %.2f\n" % training_log.BestValue,
+              "BestValue: %.3f\n" % training_log.BestValue,
               "ValueHistory: %s\n" % [round(v, 3)
                 for v in training_log.ValueHistory[-3:]],
               "BestCheckpoint: %s\n" % training_log.BestCheckpoint)
