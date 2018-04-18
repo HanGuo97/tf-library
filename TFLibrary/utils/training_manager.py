@@ -80,9 +80,16 @@ class TrainingManager(object):
                 Common choices include:
                     lambda best, history, value: value > best
         """
-        if stopping_fn and not callable(stopping_fn):
+        # never stop and always update
+        if stopping_fn is None:
+            stopping_fn = lambda best, history: False
+        if updating_fn is None:
+            updating_fn = lambda best, history, value: True
+
+        # check types
+        if not callable(stopping_fn):
             raise TypeError("`stopping_fn` should be callable")
-        if updating_fn and not callable(updating_fn):
+        if not callable(updating_fn):
             raise TypeError("`updating_fn` should be callable")
         
         # create log file
