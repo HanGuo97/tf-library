@@ -371,7 +371,7 @@ class PairwiseClassificationModel(object):
                 optimizer=self._optimizer,
                 # some gradient clipping stabilizes training in the beginning.
                 clip_gradients=self._gradient_clipping_norm,
-                summaries=["learning_rate", "loss", "gradient_norm"])
+                summaries=["learning_rate", "loss"])
 
         # Compute current predictions.
         predictions = tf.argmax(logits, axis=1)
