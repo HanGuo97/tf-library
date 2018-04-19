@@ -7,56 +7,28 @@ import collections
 from TFLibrary.utils import hparams_utils
 from tensorflow.contrib.training import HParams
 
-TrainingLog = collections.namedtuple("TrainingLog",
-    ("BestValue", "ValueHistory", "BestCheckpoint"))
-
-
-def _early_stop_with_tolerance(tolerance=5):
-    def _stopping_fn(best, history):
-        # initially None
-        if not best:
-            return False
-        # initially list()
-        if not history:
-            return False
-        # too short
-        if len(history) < tolerance:
-            return False
-
-        return best not in history[-tolerance:]
-
-    print("Early Stop with Tolerance %d" % tolerance)
-    return _stopping_fn
-
-
-def _greedy_update():
-    def _updating_fn(best, history, value):
-        # initially None
-        if not best:
-            return True
-        # initially list()
-        if not history:
-            return True
-        return value > best
-
-    return _updating_fn
+ALLOWED_VALUE_TYPES = (dict)
 
 
 class TrainingManager(object):
     """
     Training Manager for Multiple Models
 
-    It logs the dictionary {
-        Name: TrainingLog(
-            BestValue: best value throughout the training,
-            ValueHistory: list of history of values,
-            BestCheckpoint: checkpoint corresponding to best value)
-    }
+    It logs the dictionary of the structure:
+    
+    Train:
+        Name_BestValue: dictionary of numbers
+        Name_ValueHistory: dictionary of list of floats
+        Name_BestCheckpoint: checkpoint corresponding to Name_BestValue
+    
+    Test:
+        Name_Value: float or a dictionary of floats
+
+    And saves the files into /logdir/train.log, /logdir/test.log
     """
 
     def __init__(self, name, logdir,
-                 stopping_fn=_early_stop_with_tolerance(2),
-                 updating_fn=_greedy_update(),
+                 stopping_fn, updating_fn,
                  load_when_possible=True):
         """
         Initialize the TrainingManager
@@ -91,93 +63,147 @@ class TrainingManager(object):
             raise TypeError("`stopping_fn` should be callable")
         if not callable(updating_fn):
             raise TypeError("`updating_fn` should be callable")
+
+        # initialize the logs
+        test_logs = HParams()
+        train_logs = HParams()
+        train_logs.add_hparam("_".join([name, "BestValue"]), dict())
+        train_logs.add_hparam("_".join([name, "ValueHistory"]),
+                              collections.defaultdict(list))
+        train_logs.add_hparam("_".join([name, "BestCheckpoint"]), None)
         
         # create log file
-        logfile = os.path.join(logdir, "training_manager")
-
-        # initialize the training logs
-        training_logs = HParams()
-        training_logs.add_hparam(
-            name=name,
-            value=TrainingLog(
-                BestValue=None,
-                ValueHistory=list(),
-                BestCheckpoint=None))
+        test_logfile = os.path.join(logdir, "test.log")
+        train_logfile = os.path.join(logdir, "train.log")
+        
 
         self._name = name
-        self._logdir = logdir
-        self._logfile = logfile
         self._stopping_fn = stopping_fn
         self._updating_fn = updating_fn
-        self._training_logs = training_logs
+
+        self._logdir = logdir
+        self._test_logfile = test_logfile
+        self._train_logfile = train_logfile
+        
+        self._test_logs = test_logs
+        self._train_logs = train_logs
+        
 
         if load_when_possible:
             self.load()
 
-    def get_training_log(self, key, default=None):
-        return self._training_logs.get(key, default=None)
+    def get_train_attr(self, attr, default=None):
+        attr_name = "_".join([self._name, attr])
+        return self._train_logs.get(attr_name, default)
 
-    def set_training_log(self, key, value):
-        setattr(self._training_logs, key, value)
+    def set_train_attr(self, attr, value):
+        attr_name = "_".join([self._name, attr])
+        self._train_logs.set_hparam(attr_name, value)
+
+    @property
+    def best_value(self):
+        return self.get_train_attr("BestValue")
+
+    def set_best_value(self, value):
+        self.set_train_attr("BestValue", value)
+
+    @property
+    def value_history(self):
+        return self.get_train_attr("ValueHistory")
+
+    def append_to_history(self, value):
+        # since value_history is a defaultdict
+        # we just append directly without checking
+        for k, v in value.items():
+            self.value_history[k].append(v)
 
     @property
     def best_checkpoint(self):
-        training_log = self.get_training_log(self._name)
-        return training_log.BestCheckpoint
+        return self.get_train_attr("BestCheckpoint")
+
+    def set_best_checkpoint(self, ckpt):
+        self.set_train_attr("BestCheckpoint", ckpt)
+
 
     @property
     def should_stop(self):
-        training_log = self.get_training_log(self._name)
-        best_value = training_log.BestValue
-        history = training_log.ValueHistory
-        return self._stopping_fn(best_value, history)
+        # whether these dicts are empty
+        if not self.best_value:
+            return False
+        if not self.value_history:
+            return False
+
+        return self._stopping_fn(self.best_value,
+                                 self.value_history)
+
+    def should_update(self, value):
+        # whether these dicts are empty
+        if not self.best_value:
+            return True
+        if not self.value_history:
+            return True
+        return self._updating_fn(self.best_value,
+                                 self.value_history, value)
 
     def update(self, value, ckpt, verbose=False):
-        training_log = self.get_training_log(self._name)
-        best_value = training_log.BestValue
-        history = training_log.ValueHistory
-        best_checkpoint = training_log.BestCheckpoint
+        """
+        Update the manager. `value` must be of the same type
+        of `train_logs.best_value`. For example, if `train_logs.best_value`
+        is float, then `value` must be float. If `train_logs.best_value`
+        is a dictionary, then `value` must also be a dictionary of
+        with same keys
+        """
+        if not isinstance(value, ALLOWED_VALUE_TYPES):
+            raise TypeError("`value` must be allowed, "
+                            "found ", type(value))
 
-        new_history = training_log.ValueHistory + [value]
-        if self._updating_fn(best_value, history, value):
-            new_value = value
-            new_ckpt = ckpt
-        else:
-            new_value = best_value
-            new_ckpt = best_checkpoint
-        
-        new_training_log = TrainingLog(
-            BestValue=new_value,
-            ValueHistory=new_history,
-            BestCheckpoint=new_ckpt)
+        if self.should_update(value):
+            self.set_best_value(value)
+            self.set_best_checkpoint(ckpt)
 
-        self.set_training_log(
-            key=self._name,
-            value=new_training_log)
+        self.append_to_history(value)
 
         if verbose:
             self.print_info()
 
     def print_info(self):
-        training_log = self.get_training_log(self._name)
+        value_str = "".join(["%s %s " % (key, val)
+            for key, val in self.best_value.items()])
+
+        history_str = ""
+        for key, val in self.value_history.items():
+            vstr = " ".join((str(round(v, 3)) for v in val[-3:]))
+            history_str += "%s %s " % (key, vstr)
+
         print("TrainingManager INFO:\n",
-              "BestValue: %.3f\n" % training_log.BestValue,
-              "ValueHistory: %s\n" % [round(v, 3)
-                for v in training_log.ValueHistory[-3:]],
-              "BestCheckpoint: %s\n" % training_log.BestCheckpoint)
+              "BestValue: %s\n" % value_str,
+              "ValueHistory: %s\n" % history_str,
+              "BestCheckpoint: %s\n" % self.best_checkpoint)
 
     def save(self):
         hparams_utils.save_hparams(
-            hparams_file=self._logfile,
-            hparams=self._training_logs)
+            hparams_file=self._train_logfile,
+            hparams=self._train_logs)
 
-    def load(self):
+    def load(self, check_exists=False):
         # load if file exists, else None
-        training_logs = hparams_utils.load_hparams(self._logfile)
-        if training_logs is not None:
-            # when loaded, namedtuple will be automatically
-            # cast into lists , so we need to convert them back
-            values = training_logs.values()
-            for key in sorted(values.keys()):
-                training_log = TrainingLog(* values[key])
-                self.set_training_log(key=key, value=training_log)
+        loaded_logs = hparams_utils.load_hparams(self._train_logfile)
+        if check_exists and loaded_logs is None:
+            raise IOError("`logs` from %s cannot "
+                "be loaded" % self._train_logfile)
+        
+        if loaded_logs is None:
+            return
+
+        for key, val in loaded_logs.values().items():
+            try:  # create a new hps
+                self._train_logs.add_hparam(key, val)
+                print("ADDED HPS: %s" % key)
+            except ValueError:  # if this hps exists
+                # using set_hparam caused some bugs
+                # so I am forcefully using setattr
+                setattr(self._train_logs, key, val)
+                print("LOADED HPS: %s" % key)
+
+
+            

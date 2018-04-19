@@ -44,3 +44,16 @@ def save_hparams(hparams_file, hparams):
     print("  saving hparams to %s" % hparams_file)
     with codecs.getwriter("utf-8")(tf.gfile.GFile(hparams_file, "wb")) as f:
         f.write(hparams.to_json())
+
+
+def maybe_parse_standard_hparams(hparams, hparams_path):
+    """Override hparams values with existing standard hparams config."""
+    if not hparams_path:
+        return hparams
+
+    if tf.gfile.Exists(hparams_path):
+        print("# Loading standard hparams from %s" % hparams_path)
+        with tf.gfile.GFile(hparams_path, "r") as f:
+            hparams.parse_json(f.read())
+
+    return hparams
