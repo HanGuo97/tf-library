@@ -204,6 +204,3 @@ class TrainingManager(object):
                 # so I am forcefully using setattr
                 setattr(self._train_logs, key, val)
                 print("LOADED HPS: %s" % key)
-
-
-            
