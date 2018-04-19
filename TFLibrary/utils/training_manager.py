@@ -28,7 +28,8 @@ class TrainingManager(object):
     """
 
     def __init__(self, name, logdir,
-                 stopping_fn, updating_fn,
+                 stopping_fn=None,
+                 updating_fn=None,
                  load_when_possible=True):
         """
         Initialize the TrainingManager
