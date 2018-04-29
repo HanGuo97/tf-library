@@ -29,6 +29,7 @@ def get_pairwise_classification_iterator(
         skip_count=None,
         num_shards=1,
         shard_index=0,
+        shuffle=True,
         reshuffle_each_iteration=True):
 
     if not output_buffer_size:
@@ -44,8 +45,9 @@ def get_pairwise_classification_iterator(
     if skip_count is not None:
         src_tgt_dataset = src_tgt_dataset.skip(skip_count)
 
-    src_tgt_dataset = src_tgt_dataset.shuffle(
-        output_buffer_size, random_seed, reshuffle_each_iteration)
+    if shuffle:
+        src_tgt_dataset = src_tgt_dataset.shuffle(
+            output_buffer_size, random_seed, reshuffle_each_iteration)
 
     # in classification, targets are not tokenized
     src_tgt_dataset = src_tgt_dataset.map(
