@@ -6,6 +6,11 @@ from IPython.display import display
 from tensorflow.python.framework.dtypes import DType as tf_dtype
 
 
+def print_debug(*args, **kargs):
+    """Simple wrapper of print function"""
+    print("DEBUG:\t", *args, **kargs)
+
+
 def create_scope(name):
     with tf.variable_scope(name) as scope:
         pass

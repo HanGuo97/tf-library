@@ -2,6 +2,7 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
+from warnings import warn
 import tensorflow as tf
 from tensorflow.python.ops import rnn_cell_impl
 
@@ -41,7 +42,7 @@ def _single_cell(unit_type,
         single_cell = tf.nn.rnn_cell.DropoutWrapper(
             cell=single_cell, input_keep_prob=(1.0 - dropout))
 
-        print("Using Dropout of dropout_keep rate %.2f" % (1.0 - dropout))
+        warn("Using Dropout of dropout_keep rate %.2f" % (1.0 - dropout))
 
     # Residual
     if residual_connection:

@@ -264,7 +264,7 @@ class PairwiseClassificationModel(object):
         return scores
 
     def save_session(self):
-        self._saver.save(self._sess,
+        return self._saver.save(self._sess,
             save_path=self._save_path,
             global_step=self.global_step)
 
@@ -340,7 +340,8 @@ class PairwiseClassificationModel(object):
         # final linear layer
         logits = tf.layers.dense(
             inputs=features,
-            units=self._num_classes)
+            units=self._num_classes,
+            name="LogitsLayer")
 
         # store the encoder for debugging
         self._scopes = all_scopes
@@ -360,8 +361,10 @@ class PairwiseClassificationModel(object):
                 labels=labels, logits=logits))
 
         # Add the optimizer.
-        global_step_tensor = tf.Variable(
-            0, name='global_step', trainable=False)
+        # global_step_tensor = tf.Variable(
+        #     0, name='global_step', trainable=False)
+        global_step_tensor = tf.train.get_or_create_global_step(
+            graph=self._graph)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             train_op = tf.contrib.layers.optimize_loss(
@@ -384,4 +387,4 @@ class PairwiseClassificationModel(object):
         # for debugging
         self._debug["labels"] = labels
 
-        return cross_entropy, train_op, predictions, global_step_tensor
+        return train_op, cross_entropy, predictions, global_step_tensor

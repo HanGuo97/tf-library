@@ -35,7 +35,7 @@ def get_pairwise_classification_iterator(
         output_buffer_size = batch_size * 1000
 
     eos_id = tf.cast(src_vocab_table.lookup(tf.constant(eos)), tf.int32)
-    sos_id = tf.cast(tgt_vocab_table.lookup(tf.constant(sos)), tf.int32)
+    sos_id = tf.cast(src_vocab_table.lookup(tf.constant(sos)), tf.int32)
 
     src_tgt_dataset = tf.data.Dataset.zip(
         (src_dataset_1, src_dataset_2, tgt_dataset))

@@ -7,12 +7,23 @@ from collections import deque
 from contextlib import contextmanager
 
 
+def depreciation_warning(cls):
+    raise Exception("%s is depreciated" % cls.__name__)
+
+
+@contextmanager
+def calculate_time(tag):
+    start_time = time()
+    yield
+    print("%s: " % tag, time() - start_time)
+
+
 @contextmanager
 def suppress_stdout():
     with open(os.devnull, "w") as devnull:
         old_stdout = sys.stdout
         sys.stdout = devnull
-        try:  
+        try:
             yield
         finally:
             sys.stdout = old_stdout
@@ -30,6 +41,18 @@ def maybe_delete_file(file_dir, check_exists=False):
     
     elif check_exists:
         raise ValueError("File %s does not exist" % file_dir)
+
+
+def assert_all_same(items, attr=None):
+    if not isinstance(items, (list, tuple)):
+        raise TypeError("items should be list or tuple")
+
+    if attr is not None:
+        if not all(getattr(x, attr) == getattr(items[0], attr) for x in items):
+            raise ValueError("items of %s not consistent between items" % attr)
+    else:
+        if not all(x == items[0] for x in items):
+            raise ValueError("items not consistent between items")
 
 
 class ReplayBuffer(object):
