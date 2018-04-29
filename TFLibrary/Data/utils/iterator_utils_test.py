@@ -178,8 +178,5 @@ class DataReaderTest(tf.test.TestCase):
         self.assertAllEqual(expected_tgt_lens, tgt_lens, "targets")
 
 
-        return fetched_batch_dicts, tgt_lens
-
-
 if __name__ == "__main__":
     tf.test.main()
