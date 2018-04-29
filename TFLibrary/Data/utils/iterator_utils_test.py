@@ -174,7 +174,8 @@ class DataReaderTest(tf.test.TestCase):
         tgt_lens = np.stack(
             d["target_sequence_length"]
             for d in fetched_batch_dicts)
-        self.assertAllEqual(1, tgt_lens, "targets")
+        expected_tgt_lens = np.ones_like(tgt_lens)
+        self.assertAllEqual(expected_tgt_lens, tgt_lens, "targets")
 
 
         return fetched_batch_dicts, tgt_lens
