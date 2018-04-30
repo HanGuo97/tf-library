@@ -102,7 +102,7 @@ class MultiArmedBanditSelector(object):
     def sample(self, step=0):
         temperature_coef = (  # tau x rate^step
             np.power(self._temperature_anneal_rate, step)
-            if self._temperature_anneal_rate is not None else 1)
+            if self._temperature_anneal_rate is not None else 1.)
 
         chosen_action, Q_probs = boltzmann_exploration(
             Q_values=np.asarray(self.arm_weights),
