@@ -5,6 +5,7 @@ from __future__ import print_function
 import six
 import abc
 import tensorflow as tf
+from TFLibrary.Modules import utils
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -142,3 +143,33 @@ class AbstractModule(object):
     def module_name(self):
         """Returns the name of the Module."""
         return self._unique_name
+
+    def get_variables(self, collection=tf.GraphKeys.TRAINABLE_VARIABLES):
+        """Returns tuple of `tf.Variable`s declared inside this module.
+
+        Note that this operates by searching this module's variable scope,
+        and so does not know about any modules that were constructed elsewhere but
+        used inside this module.
+
+        This method explicitly re-enters the Graph which this module has been
+        connected to.
+
+        Args:
+          collection: Collection to restrict query to. By default this is
+            `tf.Graphkeys.TRAINABLE_VARIABLES`, which doesn't include non-trainable
+            variables such as moving averages.
+
+        Returns:
+          A tuple of `tf.Variable` objects.
+
+        Raises:
+          NotConnectedError: If the module is not connected to the Graph.
+        """
+        # Explicitly re-enter Graph, in case the module is being queried with a
+        # different default Graph from the one it was connected to. If this was not
+        # here then querying the variables from a different graph scope would
+        # produce an empty tuple.
+        
+        # with self._graph.as_default():
+        return utils.get_variables_in_scope(
+            self.variable_scope, collection=collection)
