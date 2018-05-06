@@ -3,6 +3,7 @@ import sys
 import random
 import pickle
 import numpy as np
+from copy import deepcopy
 from collections import deque
 from contextlib import contextmanager
 
@@ -55,77 +56,36 @@ def assert_all_same(items, attr=None):
             raise ValueError("items not consistent between items")
 
 
-class ReplayBuffer(object):
-    """
-    Data structure for implementing experience replay
+def align_on_references(source_references, source_outputs, target_references):
+    
+    # make sure they are essentially two different orderings of the same thing
+    if source_references == target_references:
+        raise ValueError("References All Ready Aligned")
+    if set(source_references) != set(target_references):
+        raise ValueError("Two References Must Be Essentially The Same Thing")
+    
+    # make sure we don't destroy original files
+    _source_references = deepcopy(source_references)
+    _source_outputs = deepcopy(source_outputs)
 
-    https://github.com/pemami4911/deep-rl
+    aligned_references = []
+    aligned_outputs = []
 
-    Author: Patrick Emami
-    """
-    def __init__(self, buffer_size, random_seed=123):
-        """
-        The right side of the deque contains the most recent experiences
-        """
-        self.buffer_size = buffer_size
-        self.count = 0
-        self.buffer = deque()
-        random.seed(random_seed)
+    for ref in target_references:
+        found_idx = _source_references.index(ref)
 
-    def add(self, s, a, r, t, s2):
-        experience = (s, a, r, t, s2)
-        if self.count < self.buffer_size:
-            self.buffer.append(experience)
-            self.count += 1
-        else:
-            self.buffer.popleft()
-            self.buffer.append(experience)
+        aligned_references.append(_source_references[found_idx])
+        aligned_outputs.append(_source_outputs[found_idx])
 
-    def size(self):
-        return self.count
-
-    def sample_batch(self, batch_size):
-        batch = []
-
-        if self.count < batch_size:
-            batch = random.sample(self.buffer, self.count)
-        else:
-            batch = random.sample(self.buffer, batch_size)
-
-        s_batch = np.array([_[0] for _ in batch])
-        a_batch = np.array([_[1] for _ in batch])
-        r_batch = np.array([_[2] for _ in batch])
-        t_batch = np.array([_[3] for _ in batch])
-        s2_batch = np.array([_[4] for _ in batch])
-
-        return s_batch, a_batch, r_batch, t_batch, s2_batch
-
-    def clear(self):
-        self.buffer.clear()
-        self.count = 0
-
-
-# https://github.com/openai/baselines/blob/master/baselines/ddpg/noise.py
-class OrnsteinUhlenbeckActionNoise(object):
-    def __init__(self, mu, sigma=0.3, theta=.15, dt=1e-2, x0=None):
-        self.theta = theta
-        self.mu = mu
-        self.sigma = sigma
-        self.dt = dt
-        self.x0 = x0
-        self.reset()
-
-    def __call__(self):
-        x = (self.x_prev + self.theta *
-             (self.mu - self.x_prev) * self.dt +
-             self.sigma * np.sqrt(self.dt) *
-             np.random.normal(size=self.mu.shape))
-        self.x_prev = x
-        return x
-
-    def reset(self):
-        self.x_prev = (self.x0 if self.x0 is not None
-                       else np.zeros_like(self.mu))
-
-    def __repr__(self):
-        return 'OrnsteinUhlenbeckActionNoise(mu={}, sigma={})'.format(self.mu, self.sigma)
+        # to avoid duplicate terms
+        _source_references.pop(found_idx)
+        _source_outputs.pop(found_idx)
+        
+        
+    if not all([target_references == aligned_references,
+                source_references != aligned_references,
+                set(source_references) == set(aligned_references),
+                set(source_outputs) == set(aligned_outputs)]):
+        raise ValueError("Alignment Failed")
+    
+    return aligned_outputs
