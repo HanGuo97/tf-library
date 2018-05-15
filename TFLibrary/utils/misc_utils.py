@@ -8,6 +8,12 @@ from collections import deque
 from contextlib import contextmanager
 
 
+def unique_ordered_list(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
+
+
 def depreciation_warning(cls):
     raise Exception("%s is depreciated" % cls.__name__)
 
