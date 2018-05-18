@@ -9,9 +9,9 @@ def read(fname):
 
 def tensorflow_dependency():
     if platform.system() == "Linux":
-        return "tensorflow-gpu>=1.5.0"
+        return "tensorflow-gpu>=1.8.0"
     else:
-        return "tensorflow>=1.5.0"
+        return "tensorflow>=1.8.0"
 
 
 setup(
