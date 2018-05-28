@@ -195,36 +195,3 @@ def test_pointer():
     
     pgens_diff = pgens - p_gens
     test_utils.tensor_is_zero(sess, pgens_diff, "PgensDIff")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
