@@ -30,6 +30,7 @@ def get_pairwise_classification_iterator(
         num_shards=1,
         shard_index=0,
         shuffle=True,
+        repeat=False,
         reshuffle_each_iteration=True):
 
     if not output_buffer_size:
@@ -99,6 +100,10 @@ def get_pairwise_classification_iterator(
             src_1, src_2, tgt,
             tf.size(src_1), tf.size(src_2), tf.size(tgt)),
         num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
+
+    if repeat:
+        # Repeat the input indefinitely.
+        src_tgt_dataset = src_tgt_dataset.repeat()
 
     # Bucket by source sequence length (buckets for lengths 0-9, 10-19, ...)
     def batching_func(x):
