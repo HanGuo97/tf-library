@@ -48,7 +48,9 @@ class Tuner(object):
             where variables starting with "TUNE_" will be replaced
             with actual values as specified in config.json
 
-    TODOs: handle crash during tuning
+    TODOs:
+    1) handle crash during tuning
+    2) add support for "evaluation_fn"
     """
 
     def __init__(self,
