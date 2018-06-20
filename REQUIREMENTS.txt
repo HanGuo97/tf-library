@@ -4,3 +4,7 @@ notebook
 sklearn
 scipy
 autograd
+jupyterlab
+tqdm
+scikit-learn
+pandas
