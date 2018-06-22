@@ -13,7 +13,8 @@ bash_script = """
 python merge_vocabs.py \\
     --names "A,B,C,D" \\
     --vocab_files "%s" \\
-    --joint_vocab_file "%s"
+    --joint_vocab_file "%s" \\
+    --build_indices
 """ % (",".join(VOCAB_FILES), JOINT_VOCAB_FILE)
 
 

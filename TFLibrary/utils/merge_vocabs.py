@@ -13,6 +13,7 @@ from TFLibrary.Data.utils import vocab_utils
 def merge_vocabs(names,
                  vocab_files,
                  joint_vocab_file,
+                 build_indices=False,
                  special_tokens=None):
     """Iteratively merge pair of vocabularies"""
     
@@ -78,18 +79,19 @@ def merge_vocabs(names,
                name, joint_vocab_overlap, vocab_size / joint_vocab_size) +
               misc_utils.bcolors.ENDC)
 
-        # note that the joint vocab is unique
-        if special_tokens is not None:
-            vocab_indices = [str(joint_vocab.index(v)) for v in vocab
-                             if v not in special_tokens]
-        else:
-            vocab_indices = [str(joint_vocab.index(v)) for v in vocab]
+        if build_indices:
+            # note that the joint vocab is unique
+            if special_tokens is not None:
+                vocab_indices = [str(joint_vocab.index(v)) for v in vocab
+                                 if v not in special_tokens]
+            else:
+                vocab_indices = [str(joint_vocab.index(v)) for v in vocab]
         
-        # /path/to/joint_vocab_file.name
-        indices_fname = ".".join([joint_vocab_file, name, "indices"])
-        with open(indices_fname, "w") as wtr:
-            wtr.write("\n".join(vocab_indices))
-            print("Wrote Indices File to ", indices_fname)
+            # /path/to/joint_vocab_file.name
+            indices_fname = ".".join([joint_vocab_file, name, "indices"])
+            with open(indices_fname, "w") as wtr:
+                wtr.write("\n".join(vocab_indices))
+                print("Wrote Indices File to ", indices_fname)
             
     
     if joint_vocab_file is not None:
@@ -105,8 +107,11 @@ if __name__ == "__main__":
         help="comma-separated list of vocab files to be procecssed")
     parser.add_argument("--joint_vocab_file", default=None,
         help="The directory to save processed vocab_file")
+    parser.add_argument("--build_indices", action="store_true",
+        help="Whether to build and save indices for each vocabs")
     parser.add_argument("--check_special_token", action="store_true",
         help="Whether to invoke check_special_token")
+
 
     FLAGS, unparsed = parser.parse_known_args()
 
@@ -122,4 +127,5 @@ if __name__ == "__main__":
     merge_vocabs(names=names,
                  vocab_files=vocab_files,
                  joint_vocab_file=FLAGS.joint_vocab_file,
+                 build_indices=FLAGS.build_indices,
                  special_tokens=special_tokens)
