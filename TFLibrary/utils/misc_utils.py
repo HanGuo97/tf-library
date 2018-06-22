@@ -15,6 +15,13 @@ from contextlib import contextmanager
 
 
 
+def read_text_file(fname):
+    with open(fname) as f:
+        texts = [d.strip() for d in f.readlines()]
+
+    return texts
+
+
 def run_command(command):
     """https://zaiste.net/realtime_output_from_shell_command_in_python/"""
     process = subprocess.Popen(command,
