@@ -1,5 +1,4 @@
-# Tensorflow Reinforcement Libraries
-A collection of implementations of RL algorithms in Tensorflow.
+# Tensorflow Libraries
 
 # Installation
 ```sh
