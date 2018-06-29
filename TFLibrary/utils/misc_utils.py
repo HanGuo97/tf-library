@@ -30,7 +30,8 @@ def run_command(command):
         line = process.stdout.readline().rstrip()
         if not line:
             break
-        print(line)
+        # originally bytes
+        print(line.decode("ascii"))
 
 
 def merge_dicts(*dict_args):
