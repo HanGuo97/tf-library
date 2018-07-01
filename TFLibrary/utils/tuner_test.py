@@ -3,6 +3,7 @@ import json
 import shutil
 import itertools
 from glob import glob
+from collections import OrderedDict
 from TFLibrary.utils.tuner import Tuner
 from TFLibrary.utils.misc_utils import read_text_file
 
@@ -59,10 +60,11 @@ python ./TunerTest/model.py \\
     --logdir  $LOGDIR
 """
 
-CONFIG_JSON = {
-    "TUNE_hparams_0": ["HPS_0_A", "HPS_0_B", "HPS_0_C"],
-    "TUNE_hparams_1": ["HPS_1_A", "HPS_1_B"],
-    "TUNE_hparams_2": [1.0, 2.0, 3.0, 4.0]}
+# use OrderDict so that the relative order won't change
+CONFIG_JSON = OrderedDict([
+    ("TUNE_hparams_0", ["HPS_0_A", "HPS_0_B", "HPS_0_C"]),
+    ("TUNE_hparams_1", ["HPS_1_A", "HPS_1_B"]),
+    ("TUNE_hparams_2", [1.0, 2.0, 3.0, 4.0])])
 
 
 def _create_test_files(logdir):
