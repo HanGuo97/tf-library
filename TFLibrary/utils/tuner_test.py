@@ -100,7 +100,7 @@ def _test_equal(logdir):
         raise ValueError("FAILED")
         
         
-def test(clean_after_test=False):
+def _test(gpus=None, clean_after_test=False):
     logdir = "./TunerTest/"
     if not os.path.isdir(logdir):
         print("Creating ", logdir)
@@ -113,14 +113,22 @@ def test(clean_after_test=False):
     tuner = Tuner(
         logdir=logdir,
         config_file=os.path.join(logdir, "config.json"),
-        execute_file=os.path.join(logdir, "executable.sh"))
+        execute_file=os.path.join(logdir, "executable.sh"),
+        gpus=gpus)
     
     tuner.tune()
     _test_equal(logdir)
     if clean_after_test:
         print("Removing ", logdir)
         shutil.rmtree(logdir)
-        
+
+
+def test():
+    _test(None, True)
+    _test("0".split(","), True)
+    _test("1,2".split(","), True)
+    _test("0,2,3".split(","), True)
+
 
 if __name__ == "__main__":
-    test(True)
+    test()

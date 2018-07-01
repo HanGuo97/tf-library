@@ -36,7 +36,7 @@ class Tuner(object):
             1. `# TUNER` to indicate where variables will be asigned
             2. As of now, only python script is supported, and each line
                 can only assign one varaibles
-            
+
             # TUNER
 
             python model.py \
@@ -49,16 +49,17 @@ class Tuner(object):
             with actual values as specified in config.json
 
     TODOs:
-    1) handle crash during tuning
-    2) add support for "evaluation_fn"
+    1) change the filenames to be more informative
+    2) Write process outputs to a text file
+    3) add support for "evaluation_fn"
     """
 
     def __init__(self,
                  logdir,
                  config_file,
                  execute_file,
+                 gpus=None,
                  evaluation_fn=None):
-
         """Create a Tuner
 
         Args:
@@ -68,12 +69,18 @@ class Tuner(object):
             execute_file:
                 String
                 Directory to the executable shell file
+            gpus:
+                List of Strings
+                GPU-IDs to be run in parallel
             evaluation_fn:
                 Callable(hparams_instance)
                 The function to be called after executing
                 the tunee to collect evaluation results
                 in arbitrary structure
         """
+        if gpus and not isinstance(gpus, (list, tuple)):
+            raise TypeError("`gpus` must be list or tuple")
+
         if evaluation_fn and not callable(evaluation_fn):
             raise TypeError("`evaluation_fn` must be callable")
 
@@ -89,24 +96,30 @@ class Tuner(object):
         if not os.path.exists(logdir):
             os.makedirs(logdir)
 
+        self._gpus = gpus
         self._logdir = logdir
         self._hparams = hparams
         self._executable = executable
         self._evaluation_fn = evaluation_fn
-        
+
         self._tmp_files = []
         self._instance_histories = []
 
-        # retoratuin will overwrite setup
+        # retoration will overwrite setup
         self._restore_or_setup()
-    
+
+    @property
+    def num_parallel(self):
+        if self._gpus is not None:
+            return len(self._gpus)
+        return None
+
     def _restore_or_setup(self):
         try:
             self.restore_tuner()
             warnings.warn("Restoring the TUNER from %s" % self._logdir)
         except FileNotFoundError:
             self._setup()
-
 
     def _setup(self):
         """Setting up the tuner"""
@@ -119,49 +132,62 @@ class Tuner(object):
         # insert one line below INDICATOR
         insert_index = self._executable.index(INDICATOR) + 1
         insertable = _create_bash_variable(hparams_instance)
-        
+
         # create an instance of executable
         executable_instance = copy.deepcopy(self._executable)
         executable_instance[insert_index: insert_index] = insertable
         return executable_instance
 
-    def _execute_exe_instance(self, executable_instance):
+    def _create_tmp_file(self):
         tmp_file = tempfile.NamedTemporaryFile(
             prefix="TUNER_", suffix=".sh",
             dir=self._logdir, delete=False)
-
         self._tmp_files.append(tmp_file.name)
-        _run_command(tmp_file.name, executable_instance)
+        return tmp_file.name
 
-    def clean_tmp_files(self):
+    def _execute_single_exe_instance(self, executable_instance):
+        tmp_file = self._create_tmp_file()
+        _run_single_command(tmp_file, executable_instance)
+
+    def _execute_multiple_exe_instances(self, executable_instances):
+        tmp_file = self._create_tmp_file()
+        _run_multiple_commands(
+            tmp_file, executable_instances, gpu_ids=self._gpus)
+
+    def _clean_tmp_files(self):
         for f in self._tmp_files:
             os.remove(f)
-
 
     def tune(self):
         # iterate until the queue is empty
 
-        pbar = trange(len(self._instance_queue))
+        if self.num_parallel:
+            pbar = trange(0, len(self._instance_queue), self.num_parallel)
+        else:
+            pbar = trange(len(self._instance_queue))
+
         for _ in pbar:
             # pbar.set_description(message)
-            
-            # fetch one hparams
-            hparams_instance = self._instance_queue.popleft()
-            executable_instance = self._create_exe_instance(hparams_instance)
+            if self.num_parallel:
+                executable_instances = []
+                for _ in range(self.num_parallel):
+                    hparams_instance = self._instance_queue.popleft()
+                    executable_instance = (
+                        self._create_exe_instance(hparams_instance))
+                    executable_instances.append(executable_instance)
 
-            # run the model
-            self._execute_exe_instance(executable_instance)
+                self._execute_multiple_exe_instances(executable_instances)
 
-            # collect evaluation results
-            if self._evaluation_fn is not None:
-                evaluation_results = self._evaluation_fn(
-                    hparams_instance)
-                # cache the history
-                self._instance_histories.append(
-                    [hparams_instance, evaluation_results])
+            else:
+                # fetch one hparams
+                hparams_instance = self._instance_queue.popleft()
+                executable_instance = (
+                    self._create_exe_instance(hparams_instance))
+
+                # run the model
+                self._execute_single_exe_instance(executable_instance)
 
             self.save_tuner()
-
 
     def save_tuner(self):
         queue_fname = os.path.join(self._logdir, "TUNER.queue")
@@ -169,21 +195,20 @@ class Tuner(object):
         misc_utils.save_object(self._instance_queue, queue_fname)
         misc_utils.save_object(self._instance_histories, history_fname)
 
-
     def restore_tuner(self):
         queue_fname = os.path.join(self._logdir, "TUNER.queue")
         history_fname = os.path.join(self._logdir, "TUNER.history")
         self._instance_queue = misc_utils.load_object(queue_fname)
         self._instance_histories = misc_utils.load_object(history_fname)
 
-        
+
 def _generate_hparam_instances(d):
     # generate all combinations of dictionary values, unnamed
     value_collections = itertools.product(*d.values())
     # map the combination of values into a named dictionary
     # using OrderedDict simply to be consistent, but dict() also works
     hparam_collections = [OrderedDict((k, v)
-                          for k, v in zip(d.keys(), vals))
+                                      for k, v in zip(d.keys(), vals))
                           for vals in value_collections]
     return hparam_collections
 
@@ -191,7 +216,7 @@ def _generate_hparam_instances(d):
 def _create_bash_variable(d):
     """Given a dictionary of key, val, return a list pf
     bash-like varaible strings such as:
-        
+
         key_0=val_0
         key_1=val_1
         ...
@@ -210,9 +235,31 @@ def _to_string(X):
     return str(X)
 
 
-def _run_command(fname, command):
+def _run_single_command(fname, command):
     """Launch the process in a separate screen"""
     with open(fname, "w") as f:
         f.write("\n".join(command))
     # print("EXECUTING: \t " + fname)
     misc_utils.run_command("bash " + fname)
+
+
+def _run_multiple_commands(fname, commands, gpu_ids=None):
+    """http://www.shakthimaan.com/posts/2014/11/27/gnu-parallel/news.html"""
+    if not gpu_ids:
+        raise ValueError("In Single GPU setting, use _run_single_command")
+
+    if not isinstance(gpu_ids, (list, tuple)):
+        raise TypeError("`gpu_ids` must be list of GPU IDs")
+
+    # e.g. FileName.sh-0
+    AddGpuIdToFileName = lambda gpu_id: "-".join([fname, gpu_id])
+
+    # e.g. FileName.sh-0, FileName.sh-2, FileName.sh-3
+    for command, gpu_id in zip(commands, gpu_ids):
+        with open(AddGpuIdToFileName(gpu_id), "w") as f:
+            f.write("\n".join(command))
+
+    command = "parallel CUDA_VISIBLE_DEVICES=\"{}\" bash %s ::: %s" % (
+        AddGpuIdToFileName("{}"), " ".join([i for i in gpu_ids]))
+    print("EXECUTING: \t " + command)
+    misc_utils.run_command(command)
