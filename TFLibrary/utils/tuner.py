@@ -50,8 +50,7 @@ class Tuner(object):
 
     TODOs:
     1) change the filenames to be more informative
-    2) Write process outputs to a text file
-    3) add support for "evaluation_fn"
+    2) add support for "evaluation_fn"
     """
 
     def __init__(self,
@@ -271,7 +270,7 @@ def _run_multiple_commands(fname, commands, gpu_ids=None, print_command=False):
 
     # https://stackoverflow.com/questions/22187834/gnu-parallel-output-each-job-to-a-different-file
     # quote out the redirect
-    command = (  # add --dry-run after `parallel` to them commands
+    command = (  # add --dry-run after `parallel` to test commands
         "parallel CUDA_VISIBLE_DEVICES=\"{}\" bash %s  \'>\'%s.log 2>&1 ::: %s"
         % (AddGpuIdToFileName("{}"),
            AddGpuIdToFileName("{}"),
