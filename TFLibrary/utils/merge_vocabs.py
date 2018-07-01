@@ -4,6 +4,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import os
+import codecs
 import argparse
 from copy import deepcopy
 from TFLibrary.utils import misc_utils
@@ -33,7 +34,7 @@ def merge_vocabs(names,
             out_dir=os.path.dirname(vocab_file),
             check_special_token=special_tokens is not None)
     
-        with open(checked_vocab_file) as f:
+        with codecs.open(checked_vocab_file, encoding="utf-8") as f:
             vocab = [d.strip() for d in f.readlines()]
             vocab_collections.append(vocab)
         
@@ -89,13 +90,13 @@ def merge_vocabs(names,
         
             # /path/to/joint_vocab_file.name
             indices_fname = ".".join([joint_vocab_file, name, "indices"])
-            with open(indices_fname, "w") as wtr:
+            with codecs.open(indices_fname, "w", encoding="utf-8") as wtr:
                 wtr.write("\n".join(vocab_indices))
                 print("Wrote Indices File to ", indices_fname)
             
     
     if joint_vocab_file is not None:
-        with open(joint_vocab_file, "w") as wtr:
+        with codecs.open(joint_vocab_file, "w", encoding="utf-8") as wtr:
             wtr.write("\n".join(joint_vocab))
 
 
