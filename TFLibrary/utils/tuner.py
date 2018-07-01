@@ -271,7 +271,7 @@ def _run_multiple_commands(fname, commands, gpu_ids=None, print_command=False):
 
     # https://stackoverflow.com/questions/22187834/gnu-parallel-output-each-job-to-a-different-file
     # quote out the redirect
-    command = (
+    command = (  # add --dry-run after `parallel` to them commands
         "parallel CUDA_VISIBLE_DEVICES=\"{}\" bash %s  \'>\'%s.log 2>&1 ::: %s"
         % (AddGpuIdToFileName("{}"),
            AddGpuIdToFileName("{}"),
