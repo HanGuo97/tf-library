@@ -59,7 +59,8 @@ class Tuner(object):
                  config_file,
                  execute_file,
                  gpus=None,
-                 evaluation_fn=None):
+                 evaluation_fn=None,
+                 print_command=False):
         """Create a Tuner
 
         Args:
@@ -101,6 +102,7 @@ class Tuner(object):
         self._hparams = hparams
         self._executable = executable
         self._evaluation_fn = evaluation_fn
+        self._print_command = print_command
 
         self._tmp_files = []
         self._instance_histories = []
@@ -140,19 +142,22 @@ class Tuner(object):
 
     def _create_tmp_file(self):
         tmp_file = tempfile.NamedTemporaryFile(
-            prefix="TUNER_", suffix=".sh",
-            dir=self._logdir, delete=False)
+            prefix="TUNER_", dir=self._logdir, delete=False)
         self._tmp_files.append(tmp_file.name)
         return tmp_file.name
 
     def _execute_single_exe_instance(self, executable_instance):
         tmp_file = self._create_tmp_file()
-        _run_single_command(tmp_file, executable_instance)
+        _run_single_command(
+            tmp_file, executable_instance,
+            print_command=self._print_command)
 
     def _execute_multiple_exe_instances(self, executable_instances):
         tmp_file = self._create_tmp_file()
         _run_multiple_commands(
-            tmp_file, executable_instances, gpu_ids=self._gpus)
+            tmp_file, executable_instances,
+            gpu_ids=self._gpus,
+            print_command=self._print_command)
 
     def _clean_tmp_files(self):
         for f in self._tmp_files:
@@ -235,15 +240,20 @@ def _to_string(X):
     return str(X)
 
 
-def _run_single_command(fname, command):
+def _run_single_command(fname, command, print_command=False):
     """Launch the process in a separate screen"""
     with open(fname, "w") as f:
         f.write("\n".join(command))
-    # print("EXECUTING: \t " + fname)
-    misc_utils.run_command("bash " + fname)
+
+    command = "bash %s  >%s.log 2>&1 " % (fname, fname)
+
+    if print_command:
+        print("EXECUTING: \t " + command)
+
+    misc_utils.run_command(command)
 
 
-def _run_multiple_commands(fname, commands, gpu_ids=None):
+def _run_multiple_commands(fname, commands, gpu_ids=None, print_command=False):
     """http://www.shakthimaan.com/posts/2014/11/27/gnu-parallel/news.html"""
     if not gpu_ids:
         raise ValueError("In Single GPU setting, use _run_single_command")
@@ -251,15 +261,23 @@ def _run_multiple_commands(fname, commands, gpu_ids=None):
     if not isinstance(gpu_ids, (list, tuple)):
         raise TypeError("`gpu_ids` must be list of GPU IDs")
 
-    # e.g. FileName.sh-0
+    # e.g. FileName-0
     AddGpuIdToFileName = lambda gpu_id: "-".join([fname, gpu_id])
 
-    # e.g. FileName.sh-0, FileName.sh-2, FileName.sh-3
+    # e.g. FileName-0, FileName-2, FileName-3
     for command, gpu_id in zip(commands, gpu_ids):
         with open(AddGpuIdToFileName(gpu_id), "w") as f:
             f.write("\n".join(command))
 
-    command = "parallel CUDA_VISIBLE_DEVICES=\"{}\" bash %s ::: %s" % (
-        AddGpuIdToFileName("{}"), " ".join([i for i in gpu_ids]))
-    print("EXECUTING: \t " + command)
+    # https://stackoverflow.com/questions/22187834/gnu-parallel-output-each-job-to-a-different-file
+    # quote out the redirect
+    command = (
+        "parallel CUDA_VISIBLE_DEVICES=\"{}\" bash %s  \'>\'%s.log 2>&1 ::: %s"
+        % (AddGpuIdToFileName("{}"),
+           AddGpuIdToFileName("{}"),
+           " ".join([i for i in gpu_ids])))
+
+    if print_command:
+        print("EXECUTING: \t " + command)
+
     misc_utils.run_command(command)

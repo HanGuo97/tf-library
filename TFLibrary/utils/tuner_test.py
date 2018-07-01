@@ -4,11 +4,11 @@ import shutil
 import itertools
 from glob import glob
 from TFLibrary.utils.tuner import Tuner
+from TFLibrary.utils.misc_utils import read_text_file
 
 
 MODEL_PY = """import os
 import argparse
-import tempfile
 
 def main():
     parser = argparse.ArgumentParser()
@@ -20,12 +20,12 @@ def main():
     
     FLAGS, unparsed = parser.parse_known_args()
     
-    
-    if FLAGS.logdir:
-        fname = "HPS0_|%s|_HPS1_|%s|_HPS2_|%s|_HPS3_|%s|" % (
-            str(FLAGS.hparam_0), str(FLAGS.hparam_1),
-            str(FLAGS.hparam_2), str(FLAGS.hparam_3))
+    fname = "HPS0_|%s|_HPS1_|%s|_HPS2_|%s|_HPS3_|%s|" % (
+        str(FLAGS.hparam_0), str(FLAGS.hparam_1),
+        str(FLAGS.hparam_2), str(FLAGS.hparam_3))
 
+    if FLAGS.logdir:
+        print(fname)
         fname = os.path.join(FLAGS.logdir, fname)
         with open(fname, "w") as f:
             f.write("")
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
 EXECUTABLE_SH = """#!/bin/bash
 
-CONSTANT=0.3
+CONSTANT=0.333
 LOGDIR="./TunerTest"
 ##################### TUNER
 
@@ -65,7 +65,6 @@ CONFIG_JSON = {
     "TUNE_hparams_2": [1.0, 2.0, 3.0, 4.0]}
 
 
-
 def _create_test_files(logdir):
     with open(os.path.join(logdir, "model.py"), "w") as f:
         f.write(MODEL_PY)
@@ -73,13 +72,25 @@ def _create_test_files(logdir):
         f.write(EXECUTABLE_SH)
     with open(os.path.join(logdir, "config.json"), "w") as f:
         json.dump(CONFIG_JSON, f)
-        
 
-def _test_equal(logdir):
-    # the filenames encodes the HPS's
-    fname_pattern = os.path.join(logdir,
-        "HPS0_|*|_HPS1_|*|_HPS2_|*|_HPS3_|*|")
-    results = glob(fname_pattern)
+
+def _test_equal(results):
+    """Two Situations:
+    
+    1. If the results is a list of filenames of the form
+
+        ./TunerTest/HPS0_|HPS_0_C|_HPS1_|HPS_1_B|_HPS2_|3.0|_HPS3_|0.3|
+    
+        >>>>> ["./TunerTest/HPS0_", "HPS_0_C", ..., "_HPS3_", "0.3", ""]
+
+    2. If the results is a list of print-outs
+
+        HPS0_|HPS_0_A|_HPS1_|HPS_1_A|_HPS2_|2.0|_HPS3_|0.3|
+    
+        >>>>> ["HPS0_", "HPS_0_B", "_HPS3_", "0.3", ""]
+
+    """
+
     hps = sorted([[d for d in f.split("|") if (
                    not d.startswith("_") and
                    not d.endswith("_") and
@@ -98,26 +109,43 @@ def _test_equal(logdir):
         print("hps\t", hps)
         print("expected_hps\t", expected_hps)
         raise ValueError("FAILED")
-        
-        
+
+
+def _test_outputs(logdir):
+    # the filenames encodes the HPS's
+    fname_pattern = os.path.join(logdir,
+        "HPS0_|*|_HPS1_|*|_HPS2_|*|_HPS3_|*|")
+    results = glob(fname_pattern)
+    _test_equal(results)
+
+
+def _test_redirection(logdir):
+    # the print-outs encodes the HPS's
+    fname_pattern = os.path.join(logdir, "*.log")
+    logfiles = glob(fname_pattern)
+    results = [read_text_file(f)[0] for f in logfiles]
+    _test_equal(results)
+
+
 def _test(gpus=None, clean_after_test=False):
     logdir = "./TunerTest/"
     if not os.path.isdir(logdir):
         print("Creating ", logdir)
         os.mkdir(logdir)
-    
+
     # create tmp files for testing
     _create_test_files(logdir=logdir)
-    
+
     # initializ the tuner
     tuner = Tuner(
         logdir=logdir,
         config_file=os.path.join(logdir, "config.json"),
         execute_file=os.path.join(logdir, "executable.sh"),
-        gpus=gpus)
-    
+        gpus=gpus, print_command=True)
+
     tuner.tune()
-    _test_equal(logdir)
+    _test_outputs(logdir)
+    _test_redirection(logdir)
     if clean_after_test:
         print("Removing ", logdir)
         shutil.rmtree(logdir)
