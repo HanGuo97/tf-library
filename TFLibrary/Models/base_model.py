@@ -18,13 +18,14 @@ class BaseModel(object):
         self._graph = graph or tf.Graph()
         self._saver_max_to_keep = saver_max_to_keep
 
-        self._check_compatability()
-
     def _check_compatability(self):
         """Check for some variables for compatability"""
         raise NotImplementedError
 
     def build(self):
+        # check vars to make sure compatible
+        self._check_compatability()
+
         with self._graph.as_default():
             self._build()
             saver = tf.train.Saver(
