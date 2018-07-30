@@ -17,7 +17,8 @@ def make_vocab(file_name, sequences, vocab_size=None):
     """
     counter = Counter()
     for seq in sequences:
-        # tokenization
+        # tokenization, texts are already preprocessed
+        # with nltk such that they are space separable
         tokens = seq.split()
         # remove empty
         tokens = [t for t in tokens if t != ""]
