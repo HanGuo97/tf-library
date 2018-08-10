@@ -56,3 +56,9 @@ class Embeddding(base.AbstractModule):
     def embeddings(self):
         """Returns the Variable containing embeddings."""
         return self._embeddings
+
+    def _clone(self, name):
+        return type(self)(vocab_size=self._vocab_size,
+                          embed_dim=self._embed_dim,
+                          trainable=self._trainable,
+                          name=name)

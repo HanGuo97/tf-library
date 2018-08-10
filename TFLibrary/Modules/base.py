@@ -173,3 +173,23 @@ class AbstractModule(object):
         # with self._graph.as_default():
         return utils.get_variables_in_scope(
             self.variable_scope, collection=collection)
+
+    def clone(self, name=None):
+        """Returns a cloned module.
+        
+        Args:
+            name: Optional string assigning name of cloned module.
+            The default name is constructed by appending "_clone"
+            to `self.module_name`.
+        
+        Returns:
+            Cloned module.
+        """
+        if name is None:
+            name = self.module_name + "_clone"
+
+        return self._clone(name=name)
+
+    @abc.abstractmethod
+    def _clone(self, name):
+        """Clone module"""

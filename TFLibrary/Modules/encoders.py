@@ -131,3 +131,15 @@ class LstmEncoder(base.AbstractModule):
             self._cell = cell
 
         return outputs, state
+
+    def _clone(self, name):
+        return type(self)(unit_type=self._unit_type,
+                          num_units=self._num_units,
+                          num_layers=self._num_layers,
+                          dropout_rate=self._dropout_rate,
+                          num_residual_layers=self._num_residual_layers,
+                          scope=name,
+                          is_training=self._is_training,
+                          bidirectional=self._bidirectional,
+                          name=name,
+                          **self._encoder_kargs)
