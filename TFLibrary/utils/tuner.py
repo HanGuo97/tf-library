@@ -2,21 +2,26 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-import re
 import os
 import copy
 import json
-import pickle
 import tempfile
 import warnings
 import itertools
-import subprocess
 from tqdm import trange
 from collections import OrderedDict, deque
 from TFLibrary.utils import misc_utils
 
 
 INDICATOR = "##################### TUNER"
+# in the servers I use, the system will detach $HOME
+# after certain hours. As a result, executing `parallel ...`
+# will raise Permission Denied issue since `parallel` is located
+# in `$HOME/bin/parallel`. A workaround is to copy the program
+# into another directory that will be detached, so have to
+# manually specify the final directory to the command
+# e.g. cp `which parallel` $PARALLEL_CMD
+PARALLEL_CMD = "/playpen/home/han/parallel_mirror"
 
 
 class Tuner(object):
@@ -271,8 +276,9 @@ def _run_multiple_commands(fname, commands, gpu_ids=None, print_command=False):
     # https://stackoverflow.com/questions/22187834/gnu-parallel-output-each-job-to-a-different-file
     # quote out the redirect
     command = (  # add --dry-run after `parallel` to test commands
-        "parallel \'CUDA_VISIBLE_DEVICES=\"{}\" bash %s >%s.log 2>&1\' ::: %s"
-        % (AddGpuIdToFileName("{}"),
+        "%s \'CUDA_VISIBLE_DEVICES=\"{}\" bash %s >%s.log 2>&1\' ::: %s"
+        % (PARALLEL_CMD,
+           AddGpuIdToFileName("{}"),
            AddGpuIdToFileName("{}"),
            " ".join([i for i in gpu_ids])))
 
