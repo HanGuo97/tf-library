@@ -21,7 +21,8 @@ INDICATOR = "##################### TUNER"
 # into another directory that will be detached, so have to
 # manually specify the final directory to the command
 # e.g. cp `which parallel` $PARALLEL_CMD
-PARALLEL_CMD = "/playpen/home/han/parallel_mirror"
+# PARALLEL_CMD = "/playpen/home/han/parallel_mirror"
+PARALLEL_CMD = "parallel"
 
 
 class Tuner(object):
@@ -158,9 +159,10 @@ class Tuner(object):
 
     def _execute_multiple_exe_instances(self, executable_instances):
         tmp_file = self._create_tmp_file()
+        gpu_ids = self._gpus[:len(executable_instances)]
         _run_multiple_commands(
             tmp_file, executable_instances,
-            gpu_ids=self._gpus,
+            gpu_ids=gpu_ids,
             print_command=self._print_command)
 
     def _clean_tmp_files(self):
@@ -180,6 +182,11 @@ class Tuner(object):
             if self.num_parallel:
                 executable_instances = []
                 for _ in range(self.num_parallel):
+                    # when the queue is exhausted
+                    if not self._instance_queue:
+                        break
+
+                    # otherwise keep popping
                     hparams_instance = self._instance_queue.popleft()
                     executable_instance = (
                         self._create_exe_instance(hparams_instance))
@@ -264,6 +271,10 @@ def _run_multiple_commands(fname, commands, gpu_ids=None, print_command=False):
 
     if not isinstance(gpu_ids, (list, tuple)):
         raise TypeError("`gpu_ids` must be list of GPU IDs")
+
+    if len(commands) != len(gpu_ids):
+        raise ValueError("%d commands != %d gpu_ids" % (
+            len(commands), len(gpu_ids)))
 
     # e.g. FileName-0
     AddGpuIdToFileName = lambda gpu_id: "-".join([fname, gpu_id])
