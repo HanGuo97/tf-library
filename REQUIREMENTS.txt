@@ -9,3 +9,5 @@ tqdm
 scikit-learn
 pandas
 tensor2tensor
+numpy
+pandas
