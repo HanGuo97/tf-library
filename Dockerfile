@@ -8,7 +8,8 @@ WORKDIR /research/TF-RLLibs
 RUN mkdir -p TFLibrary && touch TFLibrary/__init__.py
 COPY ./REQUIREMENTS.txt .
 COPY ./setup.py .
-RUN pip install -e .
+RUN pip install -e . && \
+	pip install -r REQUIREMENTS.txt
 
 # Finally, upload our actual code
 COPY . /research/TF-RLLibs
