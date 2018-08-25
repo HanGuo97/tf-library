@@ -3,9 +3,6 @@
 # https://ngc.nvidia.com/registry/nvidia-tensorflow
 FROM nvcr.io/nvidia/tensorflow:18.07-py3
 
-# Install TFLIB dependencies
-COPY . /research/TF-RLLibs
-
 # https://github.com/openai/gym/blob/master/Dockerfile
 WORKDIR /research/TF-RLLibs
 RUN mkdir -p TFLibrary && touch TFLibrary/__init__.py
