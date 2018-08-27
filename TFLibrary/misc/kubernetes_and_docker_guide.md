@@ -1,4 +1,4 @@
-# Using Kubernetes and NVIDIA Docker on DGX server
+# Using Kubernetes and NVIDIA Docker on DGX Server
 
 # NVIDIA Docker
 ### Using pre-built NVIDIA Docker Images
