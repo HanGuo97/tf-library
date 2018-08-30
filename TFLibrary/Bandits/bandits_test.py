@@ -17,7 +17,7 @@ def test():
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: 1. / float(step + 1),
-        reward_shaping_fn=lambda reward, histories: reward)
+        reward_shaping_fn=lambda reward, hists, ahists: reward)
     test_average_update(average_controller)
 
     # Gradient Updates ####################################
@@ -25,21 +25,21 @@ def test():
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: 0.3,
-        reward_shaping_fn=lambda reward, histories: reward)
+        reward_shaping_fn=lambda reward, hists, ahists: reward)
     test_gradient_update(gradient_controller, alpha=0.3)
 
     gradient_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: 0.5,
-        reward_shaping_fn=lambda reward, histories: reward)
+        reward_shaping_fn=lambda reward, hists, ahists: reward)
     test_gradient_update(gradient_controller, alpha=0.5)
 
     gradient_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: 0.7,
-        reward_shaping_fn=lambda reward, histories: reward)
+        reward_shaping_fn=lambda reward, hists, ahists: reward)
     test_gradient_update(gradient_controller, alpha=0.7)
 
 
@@ -48,14 +48,14 @@ def test():
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: np.sin(step),
-        reward_shaping_fn=lambda reward, histories: reward)
+        reward_shaping_fn=lambda reward, hists, ahists: reward)
     test_arbitrary_update(gradient_controller)
 
     gradient_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: np.cos(step),
-        reward_shaping_fn=lambda reward, histories: reward)
+        reward_shaping_fn=lambda reward, hists, ahists: reward)
     test_arbitrary_update(gradient_controller)
 
     # use slightly higher tolerance because
@@ -65,7 +65,7 @@ def test():
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: np.sqrt(step) + step / 17.3,
-        reward_shaping_fn=lambda reward, histories: reward)
+        reward_shaping_fn=lambda reward, hists, ahists: reward)
     test_arbitrary_update(gradient_controller, tolerance=1e-5)
 
 
@@ -76,12 +76,12 @@ def test():
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: 0.3,
-        reward_shaping_fn=lambda reward, histories: reward / 2.)
+        reward_shaping_fn=lambda reward, hists, ahists: reward / 2.)
     another_controller = bandits.MultiArmedBanditSelector(
         num_actions=num_actions,
         initial_weight=initial_weight,
         update_rate_fn=lambda step: 0.7,
-        reward_shaping_fn=lambda reward, histories: reward - 1)
+        reward_shaping_fn=lambda reward, hists, ahists: reward - 1)
     test_saving_and_loading(a_controller, another_controller)
 
 
@@ -120,7 +120,7 @@ def test_gradient_update(controller, alpha=0.3):
         n = len(subset)
         initial = (1 - alpha) ** n * Q_initial
         later = [alpha * (1 - alpha) ** (n - j - 1) * r
-                for j, r in enumerate(subset)]
+                 for j, r in enumerate(subset)]
         
         expected_value = initial + sum(later)
         test_utils.display("%r     %.5f == %.5f" % (

@@ -7,9 +7,23 @@ import pickle
 import warnings
 import numpy as np
 from namedlist import namedlist
-from TFLibrary.Bandits import exp3
+from collections import namedtuple
 
-Q_Entry = namedlist("Q_Entry", ("Value", "Count"))
+from TFLibrary.Bandits.base import BaseBandit
+
+Q_Entry = namedlist(
+    "Q_Entry",
+    ("Value", "Count"))
+ValueHistory = namedtuple(
+    "ValueHistory", (""))
+UpdateHistory = namedtuple(
+    "UpdateHistory",
+    ("Reward", "ShapedReward", "ChosenArm"))
+SampleHistory = namedtuple(
+    "SampleHistory",
+    ("QProbabilities", "ChosenArm"))
+
+
 
 
 def softmax(X, theta=1.0, axis=None):
@@ -43,10 +57,6 @@ def gradient_bandit(old_Q, reward, alpha):
     return new_Q
 
 
-def convert_to_one_hot(action_id, action_space):
-    return np.eye(action_space)[action_id]
-
-
 def boltzmann_exploration(Q_values, temperature=1.0):
     # for numerical stability, add 1e-7
     Q_probs = softmax(Q_values, theta=1 / (temperature + 1e-7))
@@ -54,7 +64,7 @@ def boltzmann_exploration(Q_values, temperature=1.0):
     return action, Q_probs
 
 
-class MultiArmedBanditSelector(object):
+class MultiArmedBanditSelector(BaseBandit):
     def __init__(self,
                  num_actions,
                  initial_weight,
@@ -71,14 +81,18 @@ class MultiArmedBanditSelector(object):
                     1. (constant update) lambda step: CONSTANT
                     2. (average of entire history): lambda step: 1 / (step + 1)
 
-            reward_shaping_fn: fn(reward, histories) --> Real
-                a function that takes current and histories of rewards
+            reward_shaping_fn: fn(reward, histories, arm_histories) --> Real
+                a function that takes current reward, histories of rewards
+                and the history of rewards associated with current arm
                 as inputs and produce real value, the reward to be fed into
                 the bandits algorithm
                 Common functions include:
-                    1. lambda reward, hist: reward / CONSTANT
-                    2. lambda reward, hist: [reward - mean(hist)] / std(hist)
+                    1. lambda r, hists, ahists: r / CONSTANT
+                    2. lambda r, hists, ahists: [r - mean(hists)] / std(hists)
+                    3. lambda r, hists, ahists, r - ahists[-1]
         """
+        super(MultiArmedBanditSelector, self).__init__()
+
         if not callable(update_rate_fn):
             raise TypeError("`update_rate_fn` must be callable")
         if not callable(reward_shaping_fn):
@@ -98,19 +112,28 @@ class MultiArmedBanditSelector(object):
         self._sample_histories = []
         self._update_histories = []
 
+    @property
+    def arm_weights(self):
+        return [Q.Value for Q in self._Q_entries]
+
+    @property
+    def step_counts(self):
+        return np.sum([Q.Count for Q in self._Q_entries])
 
     def sample(self, step=0):
         temperature_coef = (  # tau x rate^step
             np.power(self._temperature_anneal_rate, step)
             if self._temperature_anneal_rate is not None else 1.)
 
-        chosen_action, Q_probs = boltzmann_exploration(
+        chosen_arm, Q_probs = boltzmann_exploration(
             Q_values=np.asarray(self.arm_weights),
             temperature=self._temperature * temperature_coef)
 
-        self._sample_histories.append([Q_probs, chosen_action])
+        self._sample_histories.append(
+            SampleHistory(ChosenArm=chosen_arm,
+                          QProbabilities=Q_probs))
 
-        return chosen_action, Q_probs
+        return chosen_arm, Q_probs
 
     def update(self, reward, chosen_arm):
         # uses sampling, set weights = 1
@@ -122,32 +145,33 @@ class MultiArmedBanditSelector(object):
         step_size = self._update_rate_fn(
             self._Q_entries[chosen_arm].Count)
         shaped_reward = self._reward_shaping_fn(
-            reward, self.reward_histories)
+            reward, *self.get_reward_histories(chosen_arm))
 
         new_Q = gradient_bandit(reward=shaped_reward, alpha=step_size,
                                 old_Q=self._Q_entries[chosen_arm].Value)
         
         self._Q_entries[chosen_arm].Count += 1
         self._Q_entries[chosen_arm].Value = new_Q
-        self._update_histories.append([reward, chosen_arm, shaped_reward])
+        self._update_histories.append(
+            UpdateHistory(Reward=reward,
+                          ChosenArm=chosen_arm,
+                          ShapedReward=shaped_reward))
 
+    def get_reward_histories(self, chosen_arm=None):
+        histories = [h.Reward for h in self._update_histories]
+        arm_histories = (
+            [h.Reward for h in self._update_histories
+             if h.ChosenArm == chosen_arm]
+            if chosen_arm is not None else None)
 
-    @property
-    def arm_weights(self):
-        return [Q.Value for Q in self._Q_entries]
-
-    @property
-    def step_counts(self):
-        return np.sum([Q.Count for Q in self._Q_entries])
-
-    @property
-    def reward_histories(self):
         # at the start, the update_histories is empty
         # to avoid nan, we will force set this to 0
-        if len(self._update_histories) == 0:
-            return [0.0]
+        if len(histories) == 0:
+            histories = [0.0]
+        if len(arm_histories) == 0:
+            arm_histories = ([0.0] if chosen_arm is not None else None)
 
-        return [hist[0] for hist in self._update_histories]
+        return histories, arm_histories
 
     def save(self, file_dir):
         with open(file_dir + "._Q_entries", "wb") as f:
@@ -183,4 +207,4 @@ class MultiArmedBanditSelector(object):
         self._update_histories = update_histories
 
         print("INFO: Successfully Loaded %s from %s" %
-            (self.__class__.__name__, file_dir))
+              (self.__class__.__name__, file_dir))
