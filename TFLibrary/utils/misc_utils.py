@@ -4,13 +4,10 @@ from __future__ import absolute_import
 
 import os
 import sys
-import shlex
-import random
 import pickle
 import subprocess
-import numpy as np
+from time import time
 from copy import deepcopy
-from collections import deque
 from contextlib import contextmanager
 
 
@@ -24,8 +21,8 @@ def read_text_file(fname):
 
 def run_command(command):
     """https://zaiste.net/realtime_output_from_shell_command_in_python/"""
-    process = subprocess.Popen(command,
-        stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(
+        command, stdout=subprocess.PIPE, shell=True)
     while True:
         line = process.stdout.readline().rstrip()
         if not line:
@@ -74,12 +71,12 @@ def suppress_stdout():
 
 
 def save_object(obj, filename):
-    with open(filename, 'wb') as handle:  # Overwrites any existing file.
+    with open(filename, "wb") as handle:  # Overwrites any existing file.
         pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def load_object(filename):
-    with open(filename, 'rb') as handle:
+    with open(filename, "rb") as handle:
         obj = pickle.load(handle)
     return obj
 
