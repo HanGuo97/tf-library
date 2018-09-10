@@ -23,9 +23,9 @@ Use this [link](https://tarheellinux.unc.edu/?page_id=1024) to get user token. C
 ```bash
 kubectl get RESOURCE_TYPE [NAME] # List resource types, e.g. kubectl get pods, nodes. If NAME is specified, will list the resource type corresponding to the NAME, otherwise list all resource types
 kubectl describe RESOURCE_TYPE [NAME] # Detailed report of resource types, e.g. kubectl describe node. If NAME is specified, will list the resource type corresponding to the NAME
-kubectl exec -it NAME -- /bin/bash # Get a Shell to a Running Container
 kubectl delete -f CONFIG.yaml # Delete the object described in CONFIG.yaml
 kubectl create -f CONFIG.yaml # Create the object described in CONFIG.yaml
+kubectl exec -it NAME -- /bin/bash # Get a Shell to a Running Container
 ```
 
 ### Configuration
@@ -42,7 +42,7 @@ spec:
   backoffLimit: 5
   template:
     spec:
-      restartPolicy: Never # or OnFailure
+      restartPolicy: OnFailure # or Never
       # Pull from Private Registry
       # https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 
