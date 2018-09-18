@@ -13,3 +13,8 @@
 pip install -e .
 pip install -r REQUIREMENTS.txt
 ```
+
+# Docker
+```sh
+docker build -t tf-library:`git rev-parse --abbrev-ref HEAD` .
+```
