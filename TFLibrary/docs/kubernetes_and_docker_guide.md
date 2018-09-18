@@ -102,3 +102,6 @@ spec:
         command: ["/bin/bash"]
         args: ["-c", "SHELL_COMMAND"]
 ```
+
+### Notes
+1. If you want to mount `/proj` directories into the Kubernetes, use `/proj/bansallab/users` instead of `/proj/bansallab/users/USER` to avoid permission denied issue.

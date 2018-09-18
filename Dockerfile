@@ -1,7 +1,8 @@
-# https://gitlab.com/nvidia/samples/blob/master/cuda/ubuntu16.04/cuda-samples/Dockerfile
-# FROM nvidia/cuda:9.0-base-ubuntu16.04
 # https://ngc.nvidia.com/registry/nvidia-tensorflow
-FROM nvcr.io/nvidia/tensorflow:18.07-py3
+# FROM nvcr.io/nvidia/tensorflow:18.07-py3
+
+# This seems to work on a wider range of servers
+FROM tensorflow/tensorflow:latest-devel-gpu-py3
 
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 RUN apt-get update && apt-get install -y \
