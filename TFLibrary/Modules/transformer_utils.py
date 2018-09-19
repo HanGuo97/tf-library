@@ -10,6 +10,7 @@ from __future__ import print_function
 import tensorflow as tf
 from TFLibrary.utils import scope_utils
 from tensor2tensor.layers import common_layers
+from tensor2tensor.layers import common_attention
 
 
 # ==========================================
@@ -335,7 +336,7 @@ def add_timing_signal_1d(x,
     """
     length = common_layers.shape_list(x)[1]
     channels = common_layers.shape_list(x)[2]
-    signal = common_layers.get_timing_signal_1d(
+    signal = common_attention.get_timing_signal_1d(
         length, channels,
         min_timescale, max_timescale, start_index)
     return x + signal

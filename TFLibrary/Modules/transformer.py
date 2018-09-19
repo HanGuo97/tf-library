@@ -73,7 +73,7 @@ class TransformerEncoder(base.AbstractModule):
         self._encoder_scope = scope
         self._is_training = is_training
 
-    def _build(self, inputs):
+    def _build(self, inputs, **kwargs):  # **kwargs for compatability
         dropout_rate = self._dropout_rate if self._is_training else 0.0
 
         encoder_input = transformer_prepare_encoder(
@@ -95,6 +95,9 @@ class TransformerEncoder(base.AbstractModule):
             name="TransformerEncoder")
         
         return encoder_output
+
+    def _clone(self, name):
+        raise NotImplementedError("Cloning is not supported")
 
 
 def transformer_prepare_encoder(inputs,
