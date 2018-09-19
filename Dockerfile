@@ -6,6 +6,9 @@ FROM tensorflow/tensorflow:latest-gpu-py3
 
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 RUN apt-get update && apt-get install -y \
+	build-essential \
+	git \
+	vim \
     parallel \
  && rm -rf /var/lib/apt/lists/*
 
