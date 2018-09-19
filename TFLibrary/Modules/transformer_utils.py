@@ -218,8 +218,8 @@ def dot_product_attention(q, k, v, dropout_rate=0.0, name=None):
         A Tensor.
     """
     with tf.variable_scope(name,
-                           default_name="dot_product_attention",
-                           values=[q, k, v]) as scope:
+                           values=[q, k, v],
+                           default_name="dot_product_attention"):
         # [batch, num_heads, query_length, memory_length]
         logits = tf.matmul(q, k, transpose_b=True)
         weights = tf.nn.softmax(logits, name="attention_weights")
@@ -291,3 +291,51 @@ def multihead_attention(query_antecedent,
             name="output_transform")
 
         return x
+
+
+# ==========================================
+# Things I'm not very sure of
+# ==========================================
+
+# def add_positional_embedding(x, max_length, name):
+#     """Adds positional embedding.
+#     Args:
+#         x: Tensor with shape [batch, length, depth].
+#         max_length: int representing static maximum size of any dimension.
+#         name: str representing name of the embedding tf.Variable.
+#         positions: Tensor with shape [batch, length].
+#     Returns:
+#         Tensor of same shape as x.
+#     """
+#     with tf.name_scope("add_positional_embedding"):
+#         _, length, depth = common_layers.shape_list(x)
+#         var = tf.cast(tf.get_variable(name, [max_length, depth]), x.dtype)
+
+#         sliced = tf.cond(
+#             tf.less(length, max_length),
+#             lambda: tf.slice(var, [0, 0], [length, -1]),
+#             lambda: tf.pad(var, [[0, max(0, length - max_length)], [0, 0]]))
+#         return x + tf.expand_dims(sliced, 0)
+
+
+@scope_utils.add_name_scope()
+def add_timing_signal_1d(x,
+                         min_timescale=1.0,
+                         max_timescale=1.0e4,
+                         start_index=0):
+    """Adds a bunch of sinusoids of different frequencies to a Tensor.
+
+      Args:
+          x: a Tensor with shape [batch, length, channels]
+          min_timescale: a float
+          max_timescale: a float
+          start_index: index of first position
+      Returns:
+          a Tensor the same shape as x.
+    """
+    length = common_layers.shape_list(x)[1]
+    channels = common_layers.shape_list(x)[2]
+    signal = common_layers.get_timing_signal_1d(
+        length, channels,
+        min_timescale, max_timescale, start_index)
+    return x + signal

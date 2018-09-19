@@ -100,13 +100,14 @@ class TransformerEncoder(base.AbstractModule):
 def transformer_prepare_encoder(inputs,
                                 max_length,
                                 target_space,
-                                target_space_size):
+                                target_space_size,
+                                positional="timing"):
     """Prepare for the Transformer Encoder.
 
         1. Task-specific embedding
-        2. Positional embedding
+        2. Timing or Positional embedding
     """
-
+    encoder_input = inputs
     # Append target_space_id embedding to inputs.
     emb_target_space = transformer_utils.embedding(
         target_space,
@@ -114,14 +115,15 @@ def transformer_prepare_encoder(inputs,
         dense_size=inputs.shape.as_list()[-1],
         name="target_space_embedding",
         dtype=tf.float32)
-
-    # expand two dimensions
     emb_target_space = tf.reshape(emb_target_space, [1, 1, -1])
-    encoder_input = inputs + emb_target_space
+    encoder_input += emb_target_space
 
-    encoder_input = transformer_utils.add_positional_embedding(
-        encoder_input, max_length,
-        "inputs_positional_embedding")
+    if positional == "timing":
+        encoder_input = transformer_utils.add_timing_signal_1d(encoder_input)
+    elif positional == "emb":
+        encoder_input = transformer_utils.add_positional_embedding(
+            encoder_input, max_length,
+            "inputs_positional_embedding")
 
     return encoder_input
 
