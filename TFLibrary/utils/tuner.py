@@ -94,7 +94,7 @@ class Tuner(object):
         # using OrderedDict to prevent accident re-ordering
         # of key-val pairs in later stages
         with open(config_file) as f:
-            hparams = OrderedDict(**json.load(f))
+            hparams = json.load(f, object_pairs_hook=OrderedDict)
 
         with open(execute_file) as f:
             executable = [d.strip("\n") for d in f.readlines()]
