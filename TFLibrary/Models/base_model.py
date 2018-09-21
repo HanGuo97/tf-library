@@ -13,9 +13,15 @@ class BaseModel(object):
     def __init__(self, logdir, graph=None, saver_max_to_keep=20):
         """Base Model"""
         self._logdir = logdir
+        # directories to save checkpoints
         self._save_path = os.path.join(logdir, "model")
+        # directories to save best checkpoints
+        self._best_save_path = os.path.join(logdir, "best_model")
+        # directories to save summaries
         self._summary_dir = os.path.join(logdir, "summaries")
+        # graph object
         self._graph = graph or tf.Graph()
+        # maximum number of checkpoints to save
         self._saver_max_to_keep = saver_max_to_keep
 
     def _check_compatability(self):
@@ -30,11 +36,14 @@ class BaseModel(object):
             self._build()
             saver = tf.train.Saver(
                 max_to_keep=self._saver_max_to_keep)
+            best_saver = tf.train.Saver(
+                max_to_keep=self._saver_max_to_keep)
             file_writer = tf.summary.FileWriter(
                 self._summary_dir)
 
         self._sess = None
         self._saver = saver
+        self._best_saver = best_saver
         self._file_writer = file_writer
 
     def _build(self):
@@ -84,6 +93,12 @@ class BaseModel(object):
         return self._saver.save(
             self._sess,
             save_path=self._save_path,
+            global_step=self.global_step)
+
+    def save_best_session(self):
+        return self._best_saver.save(
+            self._sess,
+            save_path=self._best_save_path,
             global_step=self.global_step)
 
     def write_summary(self, tag, value):
