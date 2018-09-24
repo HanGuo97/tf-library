@@ -33,7 +33,7 @@ def make_vocab(file_name, sequences, vocab_size=None):
 
 
 def write_to_file(base_file_name, sequences_1, sequences_2, labels,
-                  lower=True, verbose=True):
+                  vocab_size=None, lower=True, verbose=True):
     """
     Write Sequences 1, Sequences 2 and Labels, together with
     corresponding vocab files to separate files
@@ -67,7 +67,8 @@ def write_to_file(base_file_name, sequences_1, sequences_2, labels,
     make_vocab(file_name=base_file_name + ".label_vocab",
                sequences=processed_labels)
     make_vocab(file_name=base_file_name + ".source_vocab",
-               sequences=processed_seq_1 + processed_seq_2)
+               sequences=processed_seq_1 + processed_seq_2,
+               vocab_size=vocab_size)
     
     if verbose:
         print("First 3 Seq1:\n\n" + "\n".join(processed_seq_1[:3]), "\n")
