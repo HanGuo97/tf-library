@@ -1,5 +1,7 @@
 import math
 import tensorflow as tf
+import tensorflow_hub as tf_hub
+from tensorflow.python.ops import lookup_ops
 from TFLibrary.Modules import base
 
 
@@ -62,3 +64,34 @@ class Embeddding(base.AbstractModule):
                           embed_dim=self._embed_dim,
                           trainable=self._trainable,
                           name=name)
+
+
+
+class TFHubElmoEmbedding(base.AbstractModule):
+    """Module for embdding tokens using TF-Hub ELMO"""
+    ELMO_URL = "https://tfhub.dev/google/elmo/2"
+
+    def __init__(self,
+                 vocab_file,
+                 trainable=False,
+                 name="elmo_embed"):
+        super(TFHubElmoEmbedding, self).__init__(name=name)
+        hub = tf_hub.Module(self.ELMO_URL, trainable=trainable)
+        
+        self._elmo = hub
+        self._reverse_vocab = (
+            lookup_ops.index_to_string_table_from_file(vocab_file))
+
+    def _build(self, tokens_input, tokens_length):
+        processed_input = tf.to_int64(tokens_input)
+        processed_input = self._reverse_vocab.lookup(processed_input)
+        embeddings = self._elmo(
+            inputs={"tokens": processed_input,
+                    "sequence_len": tokens_length},
+            signature="tokens",
+            as_dict=True)["elmo"]
+
+        return embeddings
+
+    def _clone(self, name):
+        raise NotImplementedError
