@@ -31,7 +31,10 @@ class CrossAttention(base.AbstractModule):
 
         # s2 representation
         # Shape: (batch_size, s2_length, s1_length)
-        seq2_seq1_attn = masked_softmax(similarity_mat, sequence_1_mask)
+        seq2_seq1_attn = masked_softmax(
+            similarity_mat,
+            # (batch_size, s1_length) --> (batch_size, 1, s1_length)
+            tf.expand_dims(sequence_1_mask, axis=1))
         # Shape: (batch_size, s2_length, encoding_dim)
         seq2_seq1_vectors = tf.matmul(seq2_seq1_attn, sequence_1)
         # batch_size, seq_len, 4*enc_dim
@@ -39,9 +42,14 @@ class CrossAttention(base.AbstractModule):
 
         # s1 representation, using same attn method
         seq1_seq2_attn = masked_softmax(
-            tf.transpose(similarity_mat, perm=(0, 2, 1)), sequence_2_mask)
+            tf.transpose(similarity_mat, perm=(0, 2, 1)),
+            # (batch_size, s2_length) --> (batch_size, 1, s2_length)
+            tf.expand_dims(sequence_2_mask, axis=1))
         # Shape: (batch_size, s1_length, encoding_dim)
         seq1_seq2_vectors = tf.matmul(seq1_seq2_attn, sequence_2)
         seq1_w_context = tf.concat([sequence_1, seq1_seq2_vectors], axis=2)
 
         return seq1_w_context, seq2_w_context
+
+    def _clone(self, name):
+        return type(self)(name=name)
