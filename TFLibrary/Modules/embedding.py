@@ -1,4 +1,5 @@
 import math
+from warnings import warn
 import tensorflow as tf
 import tensorflow_hub as tf_hub
 from tensorflow.python.ops import lookup_ops
@@ -66,7 +67,6 @@ class Embeddding(base.AbstractModule):
                           name=name)
 
 
-
 class TFHubElmoEmbedding(base.AbstractModule):
     """Module for embdding tokens using TF-Hub ELMO"""
     ELMO_URL = "https://tfhub.dev/google/elmo/2"
@@ -76,8 +76,9 @@ class TFHubElmoEmbedding(base.AbstractModule):
                  trainable=False,
                  name="elmo_embed"):
         super(TFHubElmoEmbedding, self).__init__(name=name)
-        hub = tf_hub.Module(self.ELMO_URL, trainable=trainable)
+        warn("Not Unit Test Has Been Done To Ensure Correctness")
         
+        hub = tf_hub.Module(self.ELMO_URL, trainable=trainable)
         self._elmo = hub
         self._reverse_vocab = (
             lookup_ops.index_to_string_table_from_file(vocab_file))
