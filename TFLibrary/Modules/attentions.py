@@ -1,4 +1,3 @@
-from warnings import warn
 import tensorflow as tf
 from TFLibrary.Modules import base
 
@@ -12,7 +11,7 @@ def masked_softmax(X, mask, epsilon=1e-13):
         result = tf.nn.softmax(X * mask)
         result = result * mask
         result = result / (tf.reduce_sum(
-            result, axis=1, keep_dims=True) + epsilon)
+            result, axis=-1, keep_dims=True) + epsilon)
         return result
 
 
@@ -22,7 +21,6 @@ class CrossAttention(base.AbstractModule):
 
     def __init__(self, name="cross_attention"):
         super(CrossAttention, self).__init__(name=name)
-        warn("Not Unit Test Has Been Done To Ensure Correctness")
 
     def _build(self, sequence_1, sequence_2, sequence_1_mask, sequence_2_mask):
         # Similarity matrix
