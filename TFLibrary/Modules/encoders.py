@@ -203,11 +203,11 @@ class BiDAFStyleEncoder(base.AbstractModule):
             maxlen=array_ops.shape(sequence_2)[1])
 
         # Phrase Layer
-        processed_sequence_1 = phrase_layer(
+        processed_sequence_1, _ = phrase_layer(
             inputs=sequence_1,
             sequence_length=sequence_1_length)
 
-        processed_sequence_2 = phrase_layer(
+        processed_sequence_2, _ = phrase_layer(
             inputs=sequence_2,
             sequence_length=sequence_2_length)
 
@@ -219,8 +219,20 @@ class BiDAFStyleEncoder(base.AbstractModule):
             question_mask=sequence_2_mask)
 
         # Modeling Layer
-        processed_sequence_1 = modeling_layer(
+        outputs, state = modeling_layer(
             inputs=processed_sequence,
             sequence_length=sequence_1_length)
 
-        return processed_sequence_1
+        return outputs, state
+
+    def _clone(self, name):
+        return type(self)(unit_type=self._unit_type,
+                          num_units=self._num_units,
+                          num_layers=self._num_layers,
+                          dropout_rate=self._dropout_rate,
+                          num_residual_layers=self._num_residual_layers,
+                          scope=name,
+                          is_training=self._is_training,
+                          bidirectional=self._bidirectional,
+                          name=name,
+                          **self._encoder_kargs)

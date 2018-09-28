@@ -91,19 +91,24 @@ class BiDAFAttention(base.AbstractModule):
                passage_mask,
                question_mask):
 
-        # used in later steps
+        # Length of passage
         passage_length = tf.shape(encoded_passage)[1]
+        # In matrix attention, we do w^T [X1, X2, X1 * X2] + b
+        # thus 3 * num_units
+        attention_param_num_units = self._num_units * 3
 
         # create variable
         attention_w = tf.get_variable(
             name="attention_w",
-            shape=[self._num_units],
-            initializer=utils.create_linear_initializer(self._num_units))
+            shape=[attention_param_num_units],
+            initializer=(utils.create_linear_initializer(
+                attention_param_num_units)))
 
         attention_b = tf.get_variable(
             name="attention_b",
             shape=[1],
-            initializer=utils.create_bias_initializer(self._num_units))
+            initializer=(utils.create_bias_initializer(
+                attention_param_num_units)))
 
         # Shape: (batch_size, passage_length, question_length)
         passage_question_similarity = matrix_attention(
