@@ -26,11 +26,10 @@ def matrix_attention(X1, X2, w, b):
     _X2 = tf.expand_dims(X2, axis=1)
     _X2 = tf.tile(_X2, [1, seq1_length, 1, 1])
     # [X1, X2, X1 * X2]
-    
     combined_vectors = tf.concat([_X1, _X2, _X1 * _X2], axis=-1)
     # w^T X + b
     M = tf.reduce_sum(combined_vectors * w, axis=-1)
-    # M = tf.nn.bias_add(M, b) cannot broadcast last dimension
+    # `M = tf.nn.bias_add(M, b)` cannot broadcast last dimension
     M = M + b
     return M
 

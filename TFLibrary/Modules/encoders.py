@@ -4,28 +4,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.ops import nn_ops
-from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import check_ops
 from tensorflow.python.ops import array_ops
-from tensorflow.python.ops import rnn as rnn_ops
-from tensorflow.python.ops import variable_scope as vs
-
-from tensorflow.python.layers import convolutional
-from tensorflow.python.layers import normalization
-from tensorflow.python.layers import pooling
-
 from tensorflow.python.framework import dtypes
-from tensorflow.python.framework import tensor_util
-from tensorflow.python.framework import ops as framework_ops
-
-from tensorflow.python.platform import tf_logging as logging_ops
+from tensorflow.python.ops import rnn as rnn_ops
 
 from TFLibrary.Modules import base
+from TFLibrary.Modules import attentions
 from TFLibrary.Seq2Seq import rnn_cell_utils
-from TFLibrary.Seq2Seq import lstm_utils
-from TFLibrary.utils import tensorflow_utils
-from TFLibrary.utils import misc_utils
 
 
 class LstmEncoder(base.AbstractModule):
@@ -143,3 +128,99 @@ class LstmEncoder(base.AbstractModule):
                           bidirectional=self._bidirectional,
                           name=name,
                           **self._encoder_kargs)
+
+
+class BiDAFStyleEncoder(base.AbstractModule):
+    """BiDAF Style Encoder"""
+    def __init__(self,
+                 unit_type,
+                 num_units,
+                 num_layers=1,
+                 dropout_rate=None,
+                 num_residual_layers=0,
+                 scope="BiDAFStyleEncoder",
+                 is_training=True,  # only for dropout
+                 bidirectional=True,
+                 name="BiDAFStyleEncoder",
+                 **encoder_kargs):
+
+        super(BiDAFStyleEncoder, self).__init__(name=name)
+        if not bidirectional:
+            raise NotImplementedError(
+                "Currently only Bidiretional LSTM is supported")
+
+        self._encoder_scope = scope
+        self._is_training = is_training
+        self._bidirectional = bidirectional
+
+        self._unit_type = unit_type
+        self._num_units = num_units
+        self._num_layers = num_layers
+        self._dropout_rate = dropout_rate
+        self._num_residual_layers = num_residual_layers
+
+        self._encoder_kargs = encoder_kargs
+        
+        if encoder_kargs:
+            print("Additional RNN Cell Arguments: \n")
+            addi_info = ["\t\t\t %s \t %s " % (k, v)
+                         for k, v in encoder_kargs.items()]
+            print("\n".join(addi_info))
+            print("\n")
+
+    def _build(self,
+               sequence_1,
+               sequence_2,
+               sequence_1_length,
+               sequence_2_length):
+
+        # Build modules
+        phrase_layer = LstmEncoder(
+            unit_type=self._unit_type,
+            num_units=self._num_units,
+            num_layers=self._num_layers,
+            dropout_rate=self._dropout_rate,
+            num_residual_layers=self._num_residual_layers,
+            scope=self._encoder_scope + "_PhraseLayer",
+            is_training=True,  # only for dropout
+            bidirectional=True,
+            name=self._original_name + "_PhraseLayer",
+            **self._encoder_kargs)
+
+        modeling_layer = phrase_layer.clone(
+            name=self._original_name + "_ModelingLayer")
+
+        attention_mechanism = attentions.BiDAFAttention(
+            num_units=self._num_units * 2,
+            name=self._original_name + "_BidafAttention")
+
+        # Create sequence masks
+        sequence_1_mask = array_ops.sequence_mask(
+            sequence_1_length, dtype=dtypes.float32,
+            maxlen=array_ops.shape(sequence_1)[1])
+        sequence_2_mask = array_ops.sequence_mask(
+            sequence_2_length, dtype=dtypes.float32,
+            maxlen=array_ops.shape(sequence_2)[1])
+
+        # Phrase Layer
+        processed_sequence_1 = phrase_layer(
+            inputs=sequence_1,
+            sequence_length=sequence_1_length)
+
+        processed_sequence_2 = phrase_layer(
+            inputs=sequence_2,
+            sequence_length=sequence_2_length)
+
+        # Bi-Attention Layer
+        processed_sequence = attention_mechanism(
+            encoded_passage=processed_sequence_1,
+            encoded_question=processed_sequence_2,
+            passage_mask=sequence_1_mask,
+            question_mask=sequence_2_mask)
+
+        # Modeling Layer
+        processed_sequence_1 = modeling_layer(
+            inputs=processed_sequence,
+            sequence_length=sequence_1_length)
+
+        return processed_sequence_1
