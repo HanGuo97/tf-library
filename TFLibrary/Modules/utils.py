@@ -19,17 +19,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
-import functools
-import inspect
 import re
-import weakref
-
-# Dependency imports
 import six
+import math
 import tensorflow as tf
-
-from tensorflow.python.ops import variable_scope as variable_scope_ops
 
 
 def get_variable_scope_name(value):
@@ -61,8 +54,8 @@ def get_variables_in_scope(scope, collection=tf.GraphKeys.TRAINABLE_VARIABLES):
     Args:
       scope: `tf.VariableScope` or string to retrieve variables from.
       collection: Collection to restrict query to. By default this is
-          `tf.Graphkeys.TRAINABLE_VARIABLES`, which doesn't include non-trainable
-          variables such as moving averages.
+          `tf.Graphkeys.TRAINABLE_VARIABLES`, which doesn't include
+          non-trainable variables such as moving averages.
 
     Returns:
       A tuple of `tf.Variable` objects.
@@ -99,3 +92,14 @@ def get_variables_in_module(module,
       NotConnectedError: If the module is not connected to the Graph.
     """
     return module.get_variables(collection=collection)
+
+
+def create_linear_initializer(input_size, dtype=tf.float32):
+    """Returns a default initializer for weights of a linear module."""
+    stddev = 1 / math.sqrt(input_size)
+    return tf.truncated_normal_initializer(stddev=stddev, dtype=dtype)
+
+
+def create_bias_initializer(unused_bias_shape, dtype=tf.float32):
+    """Returns a default initializer for the biases of linear module."""
+    return tf.zeros_initializer(dtype=dtype)

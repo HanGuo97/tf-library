@@ -1,14 +1,31 @@
-
+import torch
 import numpy as np
 import tensorflow as tf
-
 from IPython.display import display
 from tensorflow.python.framework.dtypes import DType as tf_dtype
 
 
-def print_debug(*args, **kargs):
-    """Simple wrapper of print function"""
-    print("DEBUG:\t", *args, **kargs)
+# def print_debug(*args, **kargs):
+#     """Simple wrapper of print function"""
+#     print("DEBUG:\t", *args, **kargs)
+
+
+def torch_to_tensor(func):
+    def decorated(*args):
+        _args = []
+        for arg in args:
+            if torch.is_tensor(arg) and arg.requires_grad:
+                _arg = arg.detach().numpy()
+            elif torch.is_tensor(arg) and not arg.requires_grad:
+                _arg = arg.numpy()
+            else:
+                _arg = arg
+            
+            _args.append(tf.convert_to_tensor(_arg, dtype=tf.float32))
+        
+        return func(*_args)
+    
+    return decorated
 
 
 def create_scope(name):
