@@ -68,26 +68,36 @@ class Embeddding(base.AbstractModule):
 
 
 class TFHubElmoEmbedding(base.AbstractModule):
-    """Module for embdding tokens using TF-Hub ELMO"""
+    """Module for embdding tokens using TF-Hub ELMO
+        
+       More information regarding the ELMO Module can be found in
+       https://alpha.tfhub.dev/google/elmo/2
+    """
+    
     ELMO_URL = "https://tfhub.dev/google/elmo/2"
 
-    def __init__(self,
-                 vocab_file,
-                 trainable=False,
-                 name="elmo_embed"):
+    def __init__(self, trainable=False, name="elmo_embed"):
         super(TFHubElmoEmbedding, self).__init__(name=name)
         warn("Not Unit Test Has Been Done To Ensure Correctness")
-        
-        hub = tf_hub.Module(self.ELMO_URL, trainable=trainable)
-        self._elmo = hub
-        self._reverse_vocab = (
-            lookup_ops.index_to_string_table_from_file(vocab_file))
+        self._trainable = trainable
+        self._elmo = tf_hub.Module(self.ELMO_URL, trainable=trainable)
 
     def _build(self, tokens_input, tokens_length):
-        processed_input = tf.to_int64(tokens_input)
-        processed_input = self._reverse_vocab.lookup(processed_input)
+        """Compute the ELMO embeddings
+
+        Args:
+            tokens_input: tf.string Tensor of [batch_size, max_length]
+            tokens_length: tf.int32 Tensor of [batch_size]
+
+        Returns:
+            embeddings: weighted sum of 3 layers (from ELMO model)
+                        [batch_size, max_length, 1024]
+        """
+        if tokens_input.dtype != tf.string:
+            raise ValueError("`tokens_input` must be tf.string")
+
         embeddings = self._elmo(
-            inputs={"tokens": processed_input,
+            inputs={"tokens": tokens_input,
                     "sequence_len": tokens_length},
             signature="tokens",
             as_dict=True)["elmo"]
@@ -95,4 +105,4 @@ class TFHubElmoEmbedding(base.AbstractModule):
         return embeddings
 
     def _clone(self, name):
-        raise NotImplementedError
+        return type(self)(trainable=self._trainable, name=name)
