@@ -22,7 +22,7 @@ def get_pairwise_classification_iterator(
         src_dataset_2,
         tgt_dataset,
         src_vocab_table,  # kept for compatability
-        tgt_vocab_table,  # kept for compatability
+        tgt_vocab_table,
         batch_size,
         sos,
         eos,
@@ -78,14 +78,14 @@ def get_pairwise_classification_iterator(
             num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
 
 
-    # # Convert the word strings to ids. Word strings that are not in the
-    # # vocab get the lookup table's default_value integer.
-    # src_tgt_dataset = src_tgt_dataset.map(
-    #     lambda src_1, src_2, tgt: (
-    #         tf.cast(src_vocab_table.lookup(src_1), tf.int32),
-    #         tf.cast(src_vocab_table.lookup(src_2), tf.int32),
-    #         tf.cast(tgt_vocab_table.lookup(tgt), tf.int32)),
-    #     num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
+    # Convert the word strings to ids. Word strings that are not in the
+    # vocab get the lookup table's default_value integer.
+    src_tgt_dataset = src_tgt_dataset.map(
+        lambda src_1, src_2, tgt: (
+            src_1,  # tf.cast(src_vocab_table.lookup(src_1), tf.int32),
+            src_2,  # tf.cast(src_vocab_table.lookup(src_2), tf.int32),
+            tf.cast(tgt_vocab_table.lookup(tgt), tf.int32)),
+        num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
 
 
     # # Create sources prefixed with <sos> and suffixed with <eos>.
@@ -137,14 +137,14 @@ def get_pairwise_classification_iterator(
     
     batched_dataset = batching_func(src_tgt_dataset)
     batched_iter = batched_dataset.make_initializable_iterator()
-    (src_1, src_2, tgt,
+    (src_1, src_2, tgt_ids,
      src_1_seq_len, src_2_seq_len, tgt_seq_len) = (batched_iter.get_next())
     
     return BatchedInput2(
         initializer=batched_iter.initializer,
         source_1=src_1,
         source_2=src_2,
-        target=tgt,
+        target=tgt_ids,
         source_1_sequence_length=src_1_seq_len,
         source_2_sequence_length=src_2_seq_len,
         target_sequence_length=tgt_seq_len)
