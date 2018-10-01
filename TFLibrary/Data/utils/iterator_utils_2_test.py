@@ -8,7 +8,7 @@ import tensorflow as tf
 from collections import OrderedDict
 from tensorflow.python.ops import lookup_ops
 from TFLibrary.Data.utils import vocab_utils
-from TFLibrary.Data.utils import iterator_utils
+from TFLibrary.Data.utils import iterator_utils_2
 
 
 BATCH_SIZE = 32
@@ -51,7 +51,7 @@ def build_data(data_file, batch_size, graph):
         src_1 = tf.data.TextLineDataset(data_file + ".sequence_1")
         src_2 = tf.data.TextLineDataset(data_file + ".sequence_2")
         tgt = tf.data.TextLineDataset(data_file + ".labels")
-        data_batch = iterator_utils.get_pairwise_classification_iterator(
+        data_batch = iterator_utils_2.get_pairwise_classification_iterator(
             src_dataset_1=src_1,
             src_dataset_2=src_2,
             tgt_dataset=tgt,
@@ -66,28 +66,21 @@ def build_data(data_file, batch_size, graph):
 
         # Additional Steps for Testing
         # ------------------------------------------
-        reverse_src_vocab_table = lookup_ops.index_to_string_table_from_file(
-            src_vocab_file, default_value=vocab_utils.UNK)
-        reverse_tgt_vocab_table = lookup_ops.index_to_string_table_from_file(
-            tgt_vocab_file)
+        reverse_tgt_vocab_table = (
+            lookup_ops.index_to_string_table_from_file(tgt_vocab_file))
 
-        reversed_src_1 = reverse_src_vocab_table.lookup(
-            tf.to_int64(data_batch.source_1))
-        reversed_src_2 = reverse_src_vocab_table.lookup(
-            tf.to_int64(data_batch.source_2))
-        reversed_tgt = reverse_tgt_vocab_table.lookup(
-            tf.to_int64(data_batch.target))
+        reversed_tgt = (
+            reverse_tgt_vocab_table.lookup(tf.to_int64(data_batch.target)))
         # ------------------------------------------
 
 
-    return (data_batch, token_vocab_size, label_vocab_size,
-            reversed_src_1, reversed_src_2, reversed_tgt)
+    return (data_batch, token_vocab_size, label_vocab_size, reversed_tgt)
 
 
 def filter_BatchedInput(batch):
     """sess.run(everything except batch.initializer)"""
-    if not isinstance(batch, iterator_utils.BatchedInput):
-        raise TypeError("`batch` must be iterator_utils.BatchedInput")
+    if not isinstance(batch, iterator_utils_2.BatchedInput2):
+        raise TypeError("`batch` must be iterator_utils_2.BatchedInput2")
     
     batched_input_dict = OrderedDict()
     for key, val in batch._asdict().items():
@@ -105,9 +98,15 @@ def remove_sos_and_eos(token):
     return token
 
 
+@np.vectorize
+def bytes_to_string(bstring):
+    return bstring.decode("utf-8")
+
+
 def process_reversed_texts(token_array):
     """Takes tokens array, removes SOS + EOS, and formats into texts"""
     texts = []
+    token_array = bytes_to_string(token_array)
     token_array = remove_sos_and_eos(token_array)
     for tokens in token_array.tolist():
         texts.append(" ".join(tokens).strip())
@@ -128,20 +127,16 @@ class DataReaderTest(tf.test.TestCase):
         (data_batch,
          token_vocab_size,
          label_vocab_size,
-         reversed_src_1,
-         reversed_src_2,
          reversed_tgt) = build_data(
             data_file=TEST_DATA_BASEDIR,
             batch_size=BATCH_SIZE, graph=graph)
 
-        reversed_sources_1 = []
-        reversed_sources_2 = []
+        sources_1 = []
+        sources_2 = []
         reversed_targets = []
 
         fetched_batch_dicts = []
         data_batch_dict = filter_BatchedInput(data_batch)
-        data_batch_dict["reversed_src_1"] = reversed_src_1
-        data_batch_dict["reversed_src_2"] = reversed_src_2
         data_batch_dict["reversed_tgt"] = reversed_tgt
         with self.test_session(graph=graph) as session:
             session.run(tf.tables_initializer())
@@ -151,26 +146,24 @@ class DataReaderTest(tf.test.TestCase):
                 fetched = session.run(data_batch_dict)
                 fetched_batch_dicts.append(fetched)
 
-                reversed_src_1 = process_reversed_texts(
-                    fetched["reversed_src_1"])
-                reversed_src_2 = process_reversed_texts(
-                    fetched["reversed_src_2"])
-                reversed_tgt = fetched["reversed_tgt"].tolist()
+                source_1 = process_reversed_texts(fetched["source_1"])
+                source_2 = process_reversed_texts(fetched["source_2"])
+                reversed_tgt = bytes_to_string(fetched["reversed_tgt"])
 
-                reversed_sources_1 += (reversed_src_1)
-                reversed_sources_2 += (reversed_src_2)
-                reversed_targets += (reversed_tgt)
+                sources_1 += (source_1)
+                sources_2 += (source_2)
+                reversed_targets += (reversed_tgt.tolist())
 
         expected_sources_1 = read_text_file(TEST_DATA_BASEDIR + ".sequence_1")
         expected_sources_2 = read_text_file(TEST_DATA_BASEDIR + ".sequence_2")
         expected_targets = read_text_file(TEST_DATA_BASEDIR + ".labels")
 
-        expected_sources_1 = expected_sources_1[:len(reversed_sources_1)]
-        expected_sources_2 = expected_sources_2[:len(reversed_sources_2)]
+        expected_sources_1 = expected_sources_1[:len(sources_1)]
+        expected_sources_2 = expected_sources_2[:len(sources_2)]
         expected_targets = expected_targets[:len(reversed_targets)]
 
-        self.assertEqual(expected_sources_1, reversed_sources_1, "sources_1")
-        self.assertEqual(expected_sources_2, reversed_sources_2, "sources_2")
+        self.assertEqual(expected_sources_1, sources_1, "sources_1")
+        self.assertEqual(expected_sources_2, sources_2, "sources_2")
         self.assertEqual(expected_targets, reversed_targets, "targets")
 
         tgt_lens = np.stack(
