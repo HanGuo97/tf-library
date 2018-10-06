@@ -258,10 +258,10 @@ class PairEncoderWithAttention(base.AbstractModule):
             # Matrix Attention
             (processed_sequence_1,
              processed_sequence_2) = self._attention_layer(
-                encoded_passage=processed_sequence_1,
-                encoded_question=processed_sequence_2,
-                passage_mask=sequence_1_mask,
-                question_mask=sequence_2_mask)
+                sequence_1=processed_sequence_1,
+                sequence_2=processed_sequence_2,
+                sequence_1_mask=sequence_1_mask,
+                sequence_2_mask=sequence_2_mask)
 
             # Modeling Layer
             processed_sequence_1, _ = self._modeling_layer(
