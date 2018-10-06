@@ -102,3 +102,6 @@ ENV/
 
 # MacOS
 .DS_Store
+
+# Personal
+code_review.md

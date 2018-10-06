@@ -1,8 +1,6 @@
 import math
-from warnings import warn
 import tensorflow as tf
 import tensorflow_hub as tf_hub
-from tensorflow.python.ops import lookup_ops
 from TFLibrary.Modules import base
 
 
@@ -78,7 +76,6 @@ class TFHubElmoEmbedding(base.AbstractModule):
 
     def __init__(self, trainable=False, name="elmo_embed"):
         super(TFHubElmoEmbedding, self).__init__(name=name)
-        warn("Not Unit Test Has Been Done To Ensure Correctness")
         self._trainable = trainable
         self._elmo = tf_hub.Module(self.ELMO_URL, trainable=trainable)
 
@@ -94,7 +91,7 @@ class TFHubElmoEmbedding(base.AbstractModule):
                         [batch_size, max_length, 1024]
         """
         if tokens_input.dtype != tf.string:
-            raise ValueError("`tokens_input` must be tf.string")
+            raise TypeError("`tokens_input` must be tf.string")
 
         embeddings = self._elmo(
             inputs={"tokens": tokens_input,
