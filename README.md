@@ -8,7 +8,7 @@ TFLibrary is an open-source toolkit based on Tensorflow, with the design goals o
 
 * [`Modules`](TFLibrary/Modules/) a simplified version of [`sonnet.modules`](https://github.com/deepmind/sonnet/blob/master/sonnet/python/modules/base.py) for modular model design.
     - [`Modules.attention`](TFLibrary/Modules/attentions.py) attention modules takes in as input multiple inputs and compute attended features, currently includes matrix cross attention and BiDAF-style attention.
-    - [`Modules.embedding`](TFLibrary/Modules/embedding.py) embedding modules takes texts or text-ids and produce dense representations, currently includes matrix embedding, ELMO embedding.
+    - [`Modules.embedding`](TFLibrary/Modules/embedding.py) embedding modules takes texts or text-ids and produce dense representations, currently includes matrix embedding, ELMO embedding, and GLOVE embedding.
     - [`Modules.encoders`](TFLibrary/Modules/encoders.py) encoder modules encodes dense representations of input texts, currently includes LSTM encoder and BiDAF-style encoder.
     - [`Modules.transformer`](TFLibrary/Modules/transformer.py) transformer modules are simplified / decomposed version of Transformer in [Tensor2Tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/transformer.py) library, currently include Transformer encoder.
 
@@ -30,5 +30,5 @@ pip install -r REQUIREMENTS.txt
 # Docker
 ```sh
 # using `--no-cache` to avoid accidentally missing changes in parent tensorflow image
-docker build --no-cache -t tf-library:`git rev-parse --abbrev-ref HEAD` .
+docker build -t tf-library:`git rev-parse --abbrev-ref HEAD` .
 ```

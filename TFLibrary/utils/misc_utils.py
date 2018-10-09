@@ -19,6 +19,13 @@ def read_text_file(fname):
     return texts
 
 
+def read_text_file_utf8(fname):
+    with open(fname, encoding="utf-8") as f:
+        texts = [d.strip() for d in f.readlines()]
+
+    return texts
+
+
 def run_command(command):
     """https://zaiste.net/realtime_output_from_shell_command_in_python/"""
     process = subprocess.Popen(

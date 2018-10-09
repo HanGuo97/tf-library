@@ -144,13 +144,16 @@ class TFHubElmoEmbedding(base.AbstractModule):
 
 
 def load_glove_from_spacy(vocab_file):
-    vocabs = misc_utils.read_text_file(vocab_file)
+    vocabs = misc_utils.read_text_file_utf8(vocab_file)
     nlp = spacy.load("en_vectors_web_lg")
 
     embeddings = []
     glove_dims = 300
     stddev = 1 / math.sqrt(len(vocabs))
     for v in vocabs:
+        # spacy by default assign 0's to OOV
+        # this will cause gradients to zero,
+        # so instead we randomly initialize them
         embedding = nlp.vocab.get_vector(v)
         if np.all(embedding == 0):
             embedding = np.random.normal(
