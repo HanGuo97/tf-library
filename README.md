@@ -18,7 +18,7 @@ TFLibrary is an open-source toolkit based on Tensorflow, with the design goals o
 
 * [`Bandit`](TFLibrary/Bandits/bandits.py) multi-armed bandit.
 
-* __`misc`__ there are also a few other models, including [`DDPG`](TFLibrary/DDPG), [`pointer network`](TFLibrary/Seq2Seq/pointer_cell.py) and its [`rnn_cell_impl.RNNCell wrapper`](TFLibrary/Seq2Seq/pointer_cell.py) version.
+* __`misc`__ there are also a few other models, including [`DDPG`](TFLibrary/DDPG), [`pointer network`](TFLibrary/SPG/pg_decoder.py) and its [`rnn_cell_impl.RNNCell wrapper`](TFLibrary/Seq2Seq/pointer_cell.py) version.
 
 
 # Installation

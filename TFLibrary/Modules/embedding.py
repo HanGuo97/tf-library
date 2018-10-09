@@ -1,7 +1,11 @@
 import math
+import spacy
+import numpy as np
 import tensorflow as tf
 import tensorflow_hub as tf_hub
 from TFLibrary.Modules import base
+from TFLibrary.Modules import utils
+from TFLibrary.utils import misc_utils
 
 
 def _embedding_dim(vocab_size):
@@ -20,24 +24,58 @@ def _embedding_dim(vocab_size):
 
 
 class Embeddding(base.AbstractModule):
-    """Module for embedding tokens in a low-dimensional space."""
+    """Module for embedding tokens in a low-dimensional space.
+
+        TOPO:
+        Add Initializer to the embedding
+    """
 
     def __init__(self,
-                 vocab_size,
+                 vocab_size=None,
                  embed_dim=None,
+                 existing_vocab=None,
                  trainable=True,
                  name="embed"):
+
+        if vocab_size is None and existing_vocab is None:
+            raise ValueError("both `vocab_size` and `existing_vocab` are none")
+
+        if existing_vocab is not None and not all(
+                x is None for x in [vocab_size, embed_dim]):
+            raise ValueError("When `existing_vocab` is provided, some of the "
+                             "arguments should not be provided.")
+
         super(Embeddding, self).__init__(name=name)
+        if existing_vocab is None:
+            embed_dim = embed_dim or _embedding_dim(self._vocab_size)
+        else:
+            existing_vocab = tf.convert_to_tensor(
+                existing_vocab, dtype=tf.float32)
+            existing_vocab_shape = existing_vocab.get_shape().with_rank(2)
+            existing_vocab_shape.assert_is_fully_defined()
+            vocab_size, embed_dim = existing_vocab_shape.as_list()
+
         self._vocab_size = vocab_size
-        self._embed_dim = embed_dim or _embedding_dim(self._vocab_size)
+        self._embed_dim = embed_dim
+        self._existing_vocab = existing_vocab
         self._trainable = trainable
+        self._initializer = utils.create_linear_initializer(vocab_size)
 
     def _build(self, ids):
         """Lookup embeddings."""
-        self._embeddings = tf.get_variable(
-            "embeddings",
-            shape=[self._vocab_size, self._embed_dim],
-            dtype=tf.float32, trainable=self._trainable)
+        if self._existing_vocab is None:
+            self._embeddings = tf.get_variable(
+                "embeddings",
+                shape=[self._vocab_size, self._embed_dim],
+                dtype=tf.float32,
+                initializer=self._initializer,
+                trainable=self._trainable)
+        else:
+            self._embeddings = tf.get_variable(
+                "embeddings",
+                dtype=tf.float32,
+                initializer=self._existing_vocab,
+                trainable=self._trainable)
 
         # Lookup embeddings
         return tf.nn.embedding_lookup(
@@ -103,3 +141,22 @@ class TFHubElmoEmbedding(base.AbstractModule):
 
     def _clone(self, name):
         return type(self)(trainable=self._trainable, name=name)
+
+
+def load_glove_from_spacy(vocab_file):
+    vocabs = misc_utils.read_text_file(vocab_file)
+    nlp = spacy.load("en_vectors_web_lg")
+
+    embeddings = []
+    glove_dims = 300
+    stddev = 1 / math.sqrt(len(vocabs))
+    for v in vocabs:
+        embedding = nlp.vocab.get_vector(v)
+        if np.all(embedding == 0):
+            embedding = np.random.normal(
+                scale=stddev, size=glove_dims)
+
+        embeddings.append(embedding)
+
+    embeddings = np.stack(embeddings)
+    return embeddings, Embeddding(existing_vocab=embeddings)
