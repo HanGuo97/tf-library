@@ -1,11 +1,8 @@
 import math
-import spacy
-import numpy as np
 import tensorflow as tf
 import tensorflow_hub as tf_hub
 from TFLibrary.Modules import base
 from TFLibrary.Modules import utils
-from TFLibrary.utils import misc_utils
 
 
 def _embedding_dim(vocab_size):
@@ -141,25 +138,3 @@ class TFHubElmoEmbedding(base.AbstractModule):
 
     def _clone(self, name):
         return type(self)(trainable=self._trainable, name=name)
-
-
-def load_glove_from_spacy(vocab_file):
-    vocabs = misc_utils.read_text_file_utf8(vocab_file)
-    nlp = spacy.load("en_vectors_web_lg")
-
-    embeddings = []
-    glove_dims = 300
-    stddev = 1 / math.sqrt(len(vocabs))
-    for v in vocabs:
-        # spacy by default assign 0's to OOV
-        # this will cause gradients to zero,
-        # so instead we randomly initialize them
-        embedding = nlp.vocab.get_vector(v)
-        if np.all(embedding == 0):
-            embedding = np.random.normal(
-                scale=stddev, size=glove_dims)
-
-        embeddings.append(embedding)
-
-    embeddings = np.stack(embeddings)
-    return embeddings, Embeddding(existing_vocab=embeddings)
