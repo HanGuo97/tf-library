@@ -96,6 +96,7 @@ class Embeddding(base.AbstractModule):
     def _clone(self, name):
         return type(self)(vocab_size=self._vocab_size,
                           embed_dim=self._embed_dim,
+                          existing_vocab=self._existing_vocab,
                           trainable=self._trainable,
                           name=name)
 

@@ -61,14 +61,17 @@ class BaseModel(object):
                                       ckpt_file=None,
                                       initialize=True,
                                       var_filter_fn=None):
-        # Initialize or restore session
-        # restore from lastest_checkpoint or specific file
-        with self._graph.as_default():
-            self._sess = tf.Session(
-                graph=self._graph,
-                config=tf_utils.get_config())
+        """Initialize or restore session,
+           restore from lastest_checkpoint or specific file."""
 
+        if not initialize and self._sess is None:
+            raise ValueError("`self._sess` is not initialized yet")
+
+        with self._graph.as_default():
             if initialize:
+                self._sess = tf.Session(
+                    graph=self._graph,
+                    config=tf_utils.get_config())
                 self._sess.run(tf.tables_initializer())
                 self._sess.run(tf.global_variables_initializer())
 
@@ -87,7 +90,6 @@ class BaseModel(object):
                                    sess=self._sess,
                                    ckpt_dir=self._logdir,
                                    ckpt_file=ckpt_file)
-                return
 
     def save_session(self):
         return self._saver.save(

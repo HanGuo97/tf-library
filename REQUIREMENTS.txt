@@ -11,4 +11,3 @@ pandas
 tensor2tensor
 numpy
 pandas
-spacy
