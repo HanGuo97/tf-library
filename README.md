@@ -32,3 +32,7 @@ pip install -r REQUIREMENTS.txt
 # using `--no-cache` to avoid accidentally missing changes in parent tensorflow image
 docker build -t tf-library:`git rev-parse --abbrev-ref HEAD` .
 ```
+
+# Versions
+### Version 0.9
+* Moved `Tuner` from `utils/` to its own directory `Tuner/`, and changed both the interface and implementation of `Tuner` to support Bayesian Optimization based tuning and more flexible extension.
