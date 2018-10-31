@@ -4,6 +4,7 @@ import oyaml as yaml
 from tqdm import tqdm
 from collections import namedtuple
 from collections import OrderedDict
+from TFLibrary.utils import misc_utils
 from TFLibrary.Tuner import utils
 from TFLibrary.Tuner import reduce_ops
 from TFLibrary.Tuner import runners as runner_ops
@@ -19,9 +20,19 @@ FeedbackCollection = namedtuple(
 MANDATORY_KEYS_AND_VALUES = {
     # `optimizerType` specifies the type of optimizer
     "optimizerType": ["gridSearch", "bayesianMin"],
-    # `maxOptimizeSteps` specifies the maximum optmizing step
+    # `maxExperiments` specifies the maximum optmizing step
     # only useful in Bayesian optimizer setting
-    "maxOptimizeSteps": None,
+    "maxExperiments": None,
+    # Running parallel trials has the benefit of reducing the
+    # time the training job takes (real time—the total processing
+    # time required is not typically changed). However, running in
+    # parallel can reduce the effectiveness of the tuning job overall.
+    # That is because hyperparameter tuning uses the results of
+    # previous trials to inform the values to assign to the
+    # hyperparameters of subsequent trials. When running in parallel,
+    # some trials start without having the benefit of the results
+    # of any trials still running.
+    "maxParallelExperiments": None,
     # `reduceOp` defines how values from one optimizer
     # are aggregated and backprop to the optimizer one level up
     "reduceOp": ["min", None],
@@ -133,9 +144,10 @@ class HparamOptimizer(object):
         # restoration will overwrite setup
         self._restore_or_setup()
         self._validate_configuration()
+        self._validate_assumtpions()
 
     @property
-    def num_parallel(self):
+    def max_parallel(self):
         if self._gpus is not None:
             return len(self._gpus)
         return None
@@ -204,33 +216,25 @@ class HparamOptimizer(object):
 
     def _setup(self):
         """Setting up:
-
+        
         - `runner` takes experiments (i.e. executable files) and
             execute them, in sequence or in parallel.
-        - `optimizer` observes the outputs of experiments and decide
-            the next parameter space point to query.
-        - `reduce_func` takes the set of observations from one optimizer,
-            and reduce and passed them to another optimizer
-        - `max_steps` the max number of optimization steps
-
         """
         # Build Runner
-        if self.num_parallel is None:
-            runner = runner_ops.BasicRunner(
-                logdir=self._logdir,
-                print_command=self._print_command)
+        if self.max_parallel is None:
+            raise NotImplementedError
         else:
-            runner = runner_ops.MultiGPURunner(
+            runner = runner_ops.SyncMultiGPURunner(
                 gpus=self._gpus,
                 logdir=self._logdir,
                 print_command=self._print_command)
-            print("MultiGPURunner: \t Num GPUs=%d" % runner.num_gpus)
+            print("SyncMultiGPURunner: \t Num GPUs=%d" % runner.max_processes)
 
         self._runner = runner
 
     def _execute_and_evaluate(self, hparams):
         """Execute and Evaluate Hparams, potentially in parallel."""
-        if self.num_parallel is None:
+        if self.max_parallel is None:
             if not isinstance(self._runner, runner_ops.BasicRunner):
                 raise TypeError("runner must be `BasicRunner`")
 
@@ -244,8 +248,8 @@ class HparamOptimizer(object):
             return self._evaluation_func(hparams)
 
         else:
-            if not isinstance(self._runner, runner_ops.MultiGPURunner):
-                raise TypeError("runner must be `MultiGPURunner`")
+            if not isinstance(self._runner, runner_ops.SyncMultiGPURunner):
+                raise TypeError("runner must be `SyncMultiGPURunner`")
 
             # Insert multiple `hparams` into multiple `_executable`
             experiments = [
@@ -272,173 +276,130 @@ class HparamOptimizer(object):
 
         return to_return
 
+    def _validate_assumtpions(self):
+        # There should be only two optimizers
+        if len(self._config) != 2:
+            raise ValueError("There must be two and only two optimizers")
+
+        if (self._config[0]["optimizerType"] != "gridSearch" and
+                self._config[1]["optimizerType"] != "bayesianMin"):
+            raise ValueError("Must consist of gridSearch + bayesianMin")
+
+        total_parallel_experiments = (
+            self._config[0]["maxParallelExperiments"] *
+            self._config[1]["maxParallelExperiments"])
+        if total_parallel_experiments != self.max_parallel:
+            raise ValueError(
+                "configs have `maxParallelExperiments` = %d x %d, #GPUs = %d"
+                % (self._config[0]["maxParallelExperiments"],
+                   self._config[1]["maxParallelExperiments"],
+                   self.max_parallel))
+
         
     def _tune(self):
-        """Tuning
+        """Tune the model Using GridSearch and Bayesian Optimization.
 
-        The Optmizers are assumed to be:
-        - independent: the optimizing trajectory of one optimizer
-            does not change the trajectory of another optimizer
-
+        Let `optimizer_A` and `optimizer_B` as GridOpt and BayesOpt,
+        where optimizer_A is on first level and optimizer_B is on the second
+        level. We can view the combinations of optimizer_A and optimizer_B
+        in a table:
+        
+        (A0, B0) o--o (A1, B0) o--o (A2, B0)
+           |             |             |
+           |             |             |
+           |             |             |
+        (A0, B1) o--o (A1, B1) o--o (A2, B1)
+           |             |             |
+           |             |             |
+           |             |             |
+        (A0, B2) o--o (A1, B2) o--o (A2, B2)
+        
+        Note that because of the hierarchical structure, there is a single
+        optimizer_A, but multiple independent optimizer_B's. We will assume:
+            1) The max experiments is the same for all optimizer_B.
+            2) optimizer_A's param decisions are independent, while
+                optimizer_B's decisions are, thus we should minimize
+                parallelization on optimizer_B while maximize parallelzation
+                on optimizer_A.
         """
-        def recursive_loop(configs,
-                           hparams=OrderedDict(),
-                           cum_num_iterations=1):
-            """Recursively loop over all optimizers.
+        config_A, config_B = self._config
 
-            Args:
-                configs: list of Optimizer configurations
-                hparams: list of hparams
-                pbar: `tqdm.trange()` from previous optimizer
+        max_parallel_A = config_A["maxParallelExperiments"]
+        max_parallel_B = config_B["maxParallelExperiments"]
+        (optimizer_A, reduce_func_A, max_experiments_A) = (
+            _build_optimizer_from_config(copy.deepcopy(config_A)))
+        
+        feedback_histories_A = []
+        observation_histories_A = []
+        feedback_histories_B = [[] for _ in range(max_experiments_A)]
+        observation_histories_B = [[] for _ in range(max_experiments_A)]
+        for i in range(0, max_experiments_A, max_parallel_A):
+            # `max_experiments_A - i` is the remaining experiments
+            num_to_query_A = min(max_parallel_A, max_experiments_A - i)
+            params_A_batch = optimizer_A.query(num_to_query_A)
+            
+            # Assemble optimizers_B
+            # Assume all optmizers_B have the same `maxExperiments`
+            # and reduce_func, thus simply using those from last one
+            optimizer_Bs = []
+            for _ in range(num_to_query_A):
+                (optimizer_B, reduce_func_B, max_experiments_B) = (
+                    _build_optimizer_from_config(copy.deepcopy(config_B)))
+                optimizer_Bs.append(optimizer_B)
 
-            Since the number of optimizers are arbitrary, and nested. We
-            use a recursive function to loop over all optimizers. For
-            example, suppose we have three optimizers A, B, and C. A iterative
-            implementation should be:
 
-            ```python
-
-            for i in range(lenA):
-                observationsA = []
-                hparamsA = optA.query()
+            for j in range(0, max_experiments_B, max_parallel_B):
+                # `max_experiments_B - j` is the remaining experiments
+                num_to_query_B = min(max_parallel_B, max_experiments_B - j)
+                params_B_batchs = [
+                    optB.query(num_to_query_B) for optB in optimizer_Bs]
                 
-                for j in range(lenB):
-                    observationsB = []
-                    hparamsB = optB.query()
-                    
-                    for k in range(lenC):
-                        observationsC = []
-                        hparamsC = optC.query()
-                        
-                        merged_hparams = merge_hparams(
-                            hparamsA, hparamsB, hparamsC)
-                        experiment = create_experiment(merged_hparams)
-                        observation = run_and_evaluate(experiment)
-                        
-                        optC.observe(observation)
-                        observationsC.append(observation)
+                # params_A_batch = [num_to_query_A]
+                # params_B_batchs = [num_to_query_A, num_to_query_B]
+                # params_to_run = [num_to_query_A x num_to_query_B]
+                params_to_run = []
+                for pA, pBs in zip(params_A_batch, params_B_batchs):
+                    params_to_run.extend([
+                        misc_utils.merge_ordered_dicts(pA, pB)
+                        for pB in pBs])
 
-                    reducedC = reduceFnC(observationsC)
-                    optB.observe(reducedC)
-                    observationsB.append(reducedC)
+                # Run the command, return [num_to_query_A x num_to_query_B]
+                observations_B = self._execute_and_evaluate(params_to_run)
 
-                reducedB = reduceFnC(observationsB)
-                optA.observe(reducedB)
-                observationsA.append(reducedB)
-
-            reducedA = reduceFnC(observationsA)
-            return observations
-            ```
-
-            Obviously, this is overly nested and non-flexible. Thus
-            we instead following a recursive implementation. Note that
-            in parallel setting, only the optimizer at the lowest level
-            will produce multiple hparams, whereas all upper level optimizers
-            runs as if non-parallel setting.
-
-            Note that in nested settings, lower optimizer need to be
-            re-initialized after each iteration in the higher level
-            (since the optimizer will become exhausted). Thus at each
-            level, we build a new instance of optimizer.
-            """
-            # When we reach the bottom level of optimizers,
-            # we will actually run the model. Since we need to
-            # know the joint hparams, during each recursive call
-            # new hparams will be merged into hparams and passed
-            # on to the next level -- and we will have the full hparams
-            # at the bottom level. We also keep track of the total
-            # iteration counts for visualizing the tuning progress.
-            if not configs:
                 # Create progress bar if not existed
                 if self._temp_pbar is None:
-                    self._temp_pbar = tqdm(total=cum_num_iterations)
+                    _num_experiments = max_experiments_A * max_experiments_B
+                    self._temp_pbar = tqdm(total=_num_experiments)
 
-                self._temp_pbar.update(
-                    1 if self.num_parallel is None
-                    else len(hparams))
+                # Update the Progress Bar
+                self._temp_pbar.update(len(params_to_run))
                 
-                return self._execute_and_evaluate(hparams)
-                
-            # In parallel setting, the last optimizer
-            # will run in parallel, whereas other optimizers
-            # run in non-parallel setting
-            num_parallel = (
-                self.num_parallel
-                # len(configs) == 1 indicates last opt
-                if len(configs) == 1 else None)
-
-            # Build Optimizer (essentially re-initialize it)
-            optimizer, reduce_func, num_iterations = (
-                _build_optimizer_from_config(configs[0]))
-
-            # Merge the total iteration counts from
-            # one level up with the `num_iterations` here
-            new_cum_num_iterations = cum_num_iterations * num_iterations
+                # Update all optimizer_Bs
+                for z, optB in enumerate(optimizer_Bs):
+                    _start_index = z * num_to_query_B
+                    _end_index = (z + 1) * num_to_query_B
+                    _observations = observations_B[_start_index: _end_index]
+                    feedback_B = optB.observe(
+                        params=params_B_batchs[z],
+                        observation=_observations)
+                    
+                    feedback_histories_B[i + z].append(feedback_B)
+                    observation_histories_B[i + z].extend(_observations)
             
-            # Observations caches all evaluation performance
-            # and will be aggregated and passed onto upper levels
-            observations = []
-
-            # Essentially equals to range(ceil(num_iterations / num_parallel)):
-            for step in range(0, num_iterations, num_parallel or 1):
-                # Make sure we don't exceed `cum_num_iterations`
-                # This is possible under Bayesian + Parallel setting
-                # e.g. there are in total 10 iterations, with 7 threads
-                # then the system will overshoot
-                num_to_query = (
-                    num_parallel if num_parallel is None else
-                    min(num_parallel, num_iterations - step))
-
-                # Ask for the suggested hparams
-                suggested_hparams = optimizer.query(num_to_query)
-
-                # Merge the hparams from one level up
-                # with the hparams at this level
-                new_hparams = utils.merge_hparams(
-                    hparams_1=copy.deepcopy(hparams),
-                    hparams_2=copy.deepcopy(suggested_hparams))
-
-                # Recursively loop over the optimizer one level downn
-                # and pass new_hparams from this optimizer
-                observation = recursive_loop(
-                    configs=configs[1:], hparams=new_hparams,
-                    cum_num_iterations=new_cum_num_iterations)
-                
-                # Update the optimizer
-                feedback = optimizer.observe(
-                    params=suggested_hparams,
-                    observation=observation)
-                
-                if isinstance(observation, (list, tuple)):
-                    if len(observation) != len(suggested_hparams):
-                        raise ValueError(
-                            "len(observation) %d != "
-                            "len(suggested_hparams) %d"
-                            % (len(observation), len(suggested_hparams)))
-
-                    # Cache the observations
-                    # In parallel setting, `observation` itself
-                    # is also a list, so we should instead add the
-                    # list into `observations` instead of appending
-                    observations = observations + observation
-                else:
-                    # Cache the observations
-                    # Here `observation` is just a scalar
-                    observations.append(observation)
-
-                # Save the history
-                # Histories are used for debugging
-                self._histories.append(FeedbackCollection(
-                    Observation=observation, Feedback=feedback))
             
-            # Aggregate all observations from the optimizer
-            # and reduce them into a single scalar to
-            # be fed into optimizer one level up
-            return reduce_func(observations)
-
-        final_observation = recursive_loop(self._config)
-
-        return final_observation
+            # [num_to_query_A, num_to_query_B] to [num_to_query_A]
+            observations_A = [
+                reduce_func_B(obhB) for obhB in
+                observation_histories_B[i: i + num_to_query_A]]
+            
+            feedback_A = optimizer_A.observe(
+                params=params_A_batch,
+                observation=observations_A)
+            feedback_histories_A.append(feedback_A)
+            observation_histories_A.extend(observations_A)
+        
+        return (reduce_func_A(observation_histories_A),
+                (feedback_histories_A, feedback_histories_B))
 
 
 def _build_optimizer_from_config(config):
@@ -470,15 +431,15 @@ def _build_optimizer_from_config(config):
 
     # Max steps to limit run time
     if (optimizer.num_iterations is not None and
-            config["maxOptimizeSteps"] is not None):
+            config["maxExperiments"] is not None):
         num_iterations = min(optimizer.num_iterations,
-                             config["maxOptimizeSteps"])
+                             config["maxExperiments"])
 
     elif optimizer.num_iterations is not None:
         num_iterations = optimizer.num_iterations
 
-    elif config["maxOptimizeSteps"] is not None:
-        num_iterations = config["maxOptimizeSteps"]
+    elif config["maxExperiments"] is not None:
+        num_iterations = config["maxExperiments"]
 
 
     return optimizer, reduce_func, num_iterations

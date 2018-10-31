@@ -1,15 +1,6 @@
 import os
 import tempfile
-from TFLibrary.utils import misc_utils
-# in the servers I use, the system will detach $HOME
-# after certain hours. As a result, executing `parallel ...`
-# will raise Permission Denied issue since `parallel` is located
-# in `$HOME/bin/parallel`. A workaround is to copy the program
-# into another directory that will be detached, so have to
-# manually specify the final directory to the command
-# e.g. cp `which parallel` $PARALLEL_CMD
-# PARALLEL_CMD = "/playpen/home/han/parallel_mirror"
-PARALLEL_CMD = "parallel"
+import subprocess
 
 
 class Runner(object):
@@ -38,37 +29,24 @@ class Runner(object):
             os.remove(f)
 
 
-class BasicRunner(Runner):
-    def __init__(self, logdir, print_command=False):
-        super(BasicRunner, self).__init__(logdir=logdir)
-        self._print_command = print_command
+class SyncMultiGPURunner(Runner):
+    """Synchronous MultiGPU Runner.
 
-    def run(self, experiments):
-        if not isinstance(experiments, (list, tuple)):
-            raise TypeError(
-                "`experiments` should be a list of commands such that "
-                "when joined becomes a valid bash script. "
-                "Found type %s" % type(experiments))
-
-        tmp_file = self._create_tmp_file()
-        _run_single_command(
-            tmp_file, experiments,
-            print_command=self._print_command)
-
-
-class MultiGPURunner(Runner):
+    `SyncMultiGPURunner` takes a set of bash scripts (experiments),
+    run them in parallel, and block until all experiments finish.
+    """
     def __init__(self, gpus, logdir, print_command=False):
         if not isinstance(gpus, (list, tuple)):
             raise TypeError("`gpus` must be list or tuple")
         if not isinstance(gpus[0], str):
             raise TypeError("`gpus` should be a list of strings")
         
-        super(MultiGPURunner, self).__init__(logdir=logdir)
+        super(SyncMultiGPURunner, self).__init__(logdir=logdir)
         self._gpus = gpus
         self._print_command = print_command
 
     @property
-    def num_gpus(self):
+    def max_processes(self):
         return len(self._gpus)
 
     def run(self, experiments):
@@ -87,58 +65,31 @@ class MultiGPURunner(Runner):
             raise ValueError(
                 "`experiments` has length %d > `num_gpus`, which has "
                 "length %d" % (len(experiments), len(self._gpus)))
-
+        
+        # Create temp file
         tmp_file = self._create_tmp_file()
-        gpu_ids = self._gpus[:len(experiments)]
-        _run_multiple_commands(
-            tmp_file, experiments,
-            gpu_ids=gpu_ids,
-            print_command=self._print_command)
+        
+        # Run the experiments
+        processes = []
+        for experiment, gpu_id in zip(experiments, self._gpus):
+            # e.g. FileName-0, FileName-2, FileName-3
+            fname = "-".join([tmp_file, gpu_id])
+            logfile = open(fname + ".log", "w")
+            with open(fname, "w") as f:
+                f.write("\n".join(experiment))
 
+            # e.g. CUDA_VISIBLE_DEVICES=3 bash FileName-3
+            command = "CUDA_VISIBLE_DEVICES=%s bash %s" % (gpu_id, fname)
+            if self._print_command:
+                print("EXECUTING: \t " + command)
+            
+            # Launch the processes
+            process = subprocess.Popen(
+                command, stdout=logfile, shell=True)
 
-def _run_single_command(fname, command, print_command=False):
-    """Launch the process in a separate screen"""
-    with open(fname, "w") as f:
-        f.write("\n".join(command))
+            processes.append((process, logfile))
 
-    command = "bash %s  >%s.log 2>&1 " % (fname, fname)
-
-    if print_command:
-        print("EXECUTING: \t " + command)
-
-    misc_utils.run_command(command)
-
-
-def _run_multiple_commands(fname, commands, gpu_ids=None, print_command=False):
-    """http://www.shakthimaan.com/posts/2014/11/27/gnu-parallel/news.html"""
-    if not gpu_ids:
-        raise ValueError("In Single GPU setting, use _run_single_command")
-
-    if not isinstance(gpu_ids, (list, tuple)):
-        raise TypeError("`gpu_ids` must be list of GPU IDs")
-
-    if len(commands) != len(gpu_ids):
-        raise ValueError("%d commands != %d gpu_ids" % (
-            len(commands), len(gpu_ids)))
-
-    # e.g. FileName-0
-    AddGpuIdToFileName = lambda gpu_id: "-".join([fname, gpu_id])
-
-    # e.g. FileName-0, FileName-2, FileName-3
-    for command, gpu_id in zip(commands, gpu_ids):
-        with open(AddGpuIdToFileName(gpu_id), "w") as f:
-            f.write("\n".join(command))
-
-    # https://stackoverflow.com/questions/22187834/gnu-parallel-output-each-job-to-a-different-file
-    # quote out the redirect
-    command = (  # add --dry-run after `parallel` to test commands
-        "%s \'CUDA_VISIBLE_DEVICES=\"{}\" bash %s >%s.log 2>&1\' ::: %s"
-        % (PARALLEL_CMD,
-           AddGpuIdToFileName("{}"),
-           AddGpuIdToFileName("{}"),
-           " ".join([i for i in gpu_ids])))
-
-    if print_command:
-        print("EXECUTING: \t " + command)
-
-    misc_utils.run_command(command)
+        # Check for completions
+        for process, logfile in processes:
+            process.wait()
+            logfile.close()

@@ -92,7 +92,9 @@ class GridSearchOptimizer(Optimizer):
         return hparams_instances
 
     def observe(self, params, observation):
-        pass
+        if not isinstance(params, (list, tuple)):
+            return None
+        return [None for _ in range(len(params))]
 
     def _generate_hparam_instances(self, d):
         # generate all combinations of dictionary values, unnamed
