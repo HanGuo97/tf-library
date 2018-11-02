@@ -107,7 +107,10 @@ class TunerTest(tf.test.TestCase):
                 if not os.path.exists(LOGDIR):
                     os.makedirs(LOGDIR)
 
-                actual_outputs_2, _ = opt.tune()
+                (actual_outputs_2,
+                 feedback_histories,
+                 observation_histories) = opt.tune()
+
                 actual_outputs_1 = [
                     misc_utils.read_text_file(fname)[0]
                     for fname in glob("TunerTest/*.log")]
@@ -121,6 +124,10 @@ class TunerTest(tf.test.TestCase):
 
                 expected_outputs_2 = _compute_expected_value()
                 self.assertEqual(expected_outputs_2, actual_outputs_2)
+                self.assertEqual(len(observation_histories[0]), 72)
+                self.assertEqual(len(observation_histories[1]), 72)
+                for i in range(len(observation_histories[1])):
+                    self.assertEqual(len(observation_histories[1][i]), 10)
 
                 shutil.rmtree(LOGDIR)
 

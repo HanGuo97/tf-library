@@ -399,7 +399,8 @@ class HparamOptimizer(object):
             observation_histories_A.extend(observations_A)
         
         return (reduce_func_A(observation_histories_A),
-                (feedback_histories_A, feedback_histories_B))
+                (feedback_histories_A, feedback_histories_B),
+                (observation_histories_A, observation_histories_B))
 
 
 def _build_optimizer_from_config(config):
