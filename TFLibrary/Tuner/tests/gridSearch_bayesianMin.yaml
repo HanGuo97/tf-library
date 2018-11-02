@@ -1,5 +1,23 @@
+- optimizerType: gridSearch
+  maxExperiments: null
+  maxParallelExperiments: 3
+  reduceOp: min
+  paramSpace:
+    gridArg1:
+      - "Option-1"
+      - "Option-2"
+      - "Option-3"
+    gridArg2:
+      - "Standard"
+      - "Exceptional"
+    gridArg3: [0.001, 0.0005, 0.0001]
+    gridArg4: [0.3]
+    gridArg5: [1.0, null]
+    gridArg6: [1, 2]
+
 - optimizerType: bayesianMin
-  maxOptimizeSteps: 20
+  maxExperiments: 10
+  maxParallelExperiments: 2
   reduceOp: min
   paramSpace:
     bayesianArg1:

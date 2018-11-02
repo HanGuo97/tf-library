@@ -1,5 +1,6 @@
 - optimizerType: gridSearch
-  maxOptimizeSteps: null
+  maxExperiments: null
+  maxParallelExperiments: 3
   reduceOp: min
   paramSpace:
     gridArg1:
@@ -14,11 +15,14 @@
     gridArg5: [1.0, null]
     gridArg6: [1, 2]
 
-    # Overlapping Space
-    bayesianArg3: [3, null]
+    # Overlapping
+    bayesianArg5:
+      type: categorical
+      categories: [c1, c2, c5, c9, c00]
 
 - optimizerType: bayesianMin
-  maxOptimizeSteps: 20
+  maxExperiments: 10
+  maxParallelExperiments: 2
   reduceOp: min
   paramSpace:
     bayesianArg1:
@@ -30,65 +34,20 @@
       low: 0
       high: 3
     bayesianArg3:
-      type: integer
-      low: 0
-      high: 3
+      type: real
+      low: -10
+      high: 7.5
     bayesianArg4:
       type: real
       low: 0
       high: 3
     bayesianArg5:
       type: categorical
-      categories: [c1, c2, c5]
+      categories: [c1, c2, c5, c9, c00]
 ---
 - optimizerType: gridSearch
-  maxOptimizeSteps: null
-  reduceOp: min
-  paramSpace:
-    gridArg1:
-      - "Option-1"
-      - "Option-2"
-      - "Option-3"
-    gridArg2:
-      - "Standard"
-      - "Exceptional"
-    gridArg3: [0.001, 0.0005, 0.0001]
-    gridArg4: [0.3]
-    gridArg5: [1.0, null]
-    gridArg6: [1, 2]
-
-    # Overlapping Space
-    bayesianArg2:
-      type: integer
-      low: 0
-      high: 3
-
-- optimizerType: bayesianMin
-  maxOptimizeSteps: 20
-  reduceOp: min
-  paramSpace:
-    bayesianArg1:
-      type: integer
-      low: 1
-      high: 3
-    bayesianArg2:
-      type: integer
-      low: 0
-      high: 3
-    bayesianArg3:
-      type: integer
-      low: 0
-      high: 3
-    bayesianArg4:
-      type: real
-      low: 0
-      high: 3
-    bayesianArg5:
-      type: categorical
-      categories: [c1, c2, c5]
----
-- optimizerType: gridSearch
-  maxOptimizeSteps: null
+  maxExperiments: null
+  maxParallelExperiments: 3
   reduceOp: min
   paramSpace:
     gridArg1:
@@ -104,7 +63,8 @@
     gridArg6: [1, 2]
 
 - optimizerType: bayesianMin
-  maxOptimizeSteps: 20
+  maxExperiments: 10
+  maxParallelExperiments: 2
   reduceOp: min
   paramSpace:
     bayesianArg1:
@@ -115,18 +75,18 @@
       type: integer
       low: 0
       high: 3
-
-    # Overlapping Space
-    gridArg5: [1.0, null]
-    
     bayesianArg3:
-      type: integer
-      low: 0
-      high: 3
+      type: real
+      low: -10
+      high: 7.5
     bayesianArg4:
       type: real
       low: 0
       high: 3
+
+    # Overlapping
+    gridArg3: [0.001, 0.0005, 0.0001]
+
     bayesianArg5:
       type: categorical
-      categories: [c1, c2, c5]
+      categories: [c1, c2, c5, c9, c00]

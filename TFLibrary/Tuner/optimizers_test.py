@@ -6,7 +6,7 @@ from skopt.space import space as skopt_space
 
 
 def get_example_config():
-    with open("tests/example.yaml") as f:
+    with open("tests/gridSearch_bayesianMin.yaml") as f:
         config = yaml.load(f)
 
     return config
@@ -55,9 +55,10 @@ class OptimizersTest(tf.test.TestCase):
         expected_params = [
             skopt_space.Integer(low=1, high=3),
             skopt_space.Integer(low=0, high=3),
-            skopt_space.Integer(low=0, high=3),
+            skopt_space.Real(low=-10, high=7.5),
             skopt_space.Real(low=0, high=3),
-            skopt_space.Categorical(categories=("c1", "c2", "c5"))]
+            skopt_space.Categorical(
+                categories=("c1", "c2", "c5", "c9", "c00"))]
 
 
         self.assertEqual(expected_params, optimizer._dimensions)

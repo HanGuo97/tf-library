@@ -1,9 +1,9 @@
 - optimizerType: gridSearch
-  maxOptimizeSteps: null
+  maxExperiments: null
+  maxParallelExperiments: 3
   reduceOp: min
   # This key is not allowed
   invalidKey: null
-
   paramSpace:
     gridArg1:
       - "Option-1"
@@ -18,7 +18,8 @@
     gridArg6: [1, 2]
 
 - optimizerType: bayesianMin
-  maxOptimizeSteps: 20
+  maxExperiments: 10
+  maxParallelExperiments: 2
   reduceOp: min
   paramSpace:
     bayesianArg1:
@@ -30,20 +31,20 @@
       low: 0
       high: 3
     bayesianArg3:
-      type: integer
-      low: 0
-      high: 3
+      type: real
+      low: -10
+      high: 7.5
     bayesianArg4:
       type: real
       low: 0
       high: 3
     bayesianArg5:
       type: categorical
-      categories: [c1, c2, c5]
+      categories: [c1, c2, c5, c9, c00]
 ---
 - optimizerType: gridSearch
-  # This is a mandatoru key
-  # maxOptimizeSteps: null
+  maxExperiments: null
+  maxParallelExperiments: 3
   reduceOp: min
   paramSpace:
     gridArg1:
@@ -59,7 +60,9 @@
     gridArg6: [1, 2]
 
 - optimizerType: bayesianMin
-  maxOptimizeSteps: 20
+  # This is a mandatory key
+  # maxExperiments: 10
+  maxParallelExperiments: 2
   reduceOp: min
   paramSpace:
     bayesianArg1:
@@ -71,19 +74,20 @@
       low: 0
       high: 3
     bayesianArg3:
-      type: integer
-      low: 0
-      high: 3
+      type: real
+      low: -10
+      high: 7.5
     bayesianArg4:
       type: real
       low: 0
       high: 3
     bayesianArg5:
       type: categorical
-      categories: [c1, c2, c5]
+      categories: [c1, c2, c5, c9, c00]
 ---
 - optimizerType: gridSearch
-  maxOptimizeSteps: null
+  maxExperiments: null
+  maxParallelExperiments: 3
   reduceOp: min
   paramSpace:
     gridArg1:
@@ -99,8 +103,9 @@
     gridArg6: [1, 2]
 
 # Invalid Value
-- optimizerType: gaussianProcess
-  maxOptimizeSteps: 20
+- optimizerType: gaussianProcesses
+  maxExperiments: 10
+  maxParallelExperiments: 2
   reduceOp: min
   paramSpace:
     bayesianArg1:
@@ -112,13 +117,13 @@
       low: 0
       high: 3
     bayesianArg3:
-      type: integer
-      low: 0
-      high: 3
+      type: real
+      low: -10
+      high: 7.5
     bayesianArg4:
       type: real
       low: 0
       high: 3
     bayesianArg5:
       type: categorical
-      categories: [c1, c2, c5]
+      categories: [c1, c2, c5, c9, c00]

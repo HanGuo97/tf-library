@@ -160,7 +160,7 @@ class HparamOptimizer(object):
         2. Check whether the space of multiple optimizers overlap
         """
         # Currently only nested optimizers of depth 2 is tested
-        if len(self._config) > 2:
+        if len(self._config) != 2:
             raise NotImplementedError(
                 "Only Nested config of depth within 2 is tested")
 
@@ -222,7 +222,7 @@ class HparamOptimizer(object):
         """
         # Build Runner
         if self.max_parallel is None:
-            raise NotImplementedError
+            raise NotImplementedError("Non-Parallel NotImplemented")
         else:
             runner = runner_ops.SyncMultiGPURunner(
                 gpus=self._gpus,
