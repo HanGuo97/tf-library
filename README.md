@@ -12,9 +12,10 @@ TFLibrary is an open-source toolkit based on Tensorflow, with the design goals o
     - [`Modules.encoders`](TFLibrary/Modules/encoders.py) encoder modules encodes dense representations of input texts, currently includes LSTM encoder and BiDAF-style encoder.
     - [`Modules.transformer`](TFLibrary/Modules/transformer.py) transformer modules are simplified / decomposed version of Transformer in [Tensor2Tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/transformer.py) library, currently include Transformer encoder.
 
+* [`Tuner`](TFLibrary/Tuner/tuner.py) Hyper-parameter tuner using grid search as well as Bayesian Optimization, with support for multi-GPUs in parallel computations settings.
+
 * [`utils`](TFLibrary/utils/) a collection of various utility functions.
     - [`utils.TrainingManager`](TFLibrary/utils/training_manager.py) a light helper class for monitoring training progress, and providing signals for early stopping.
-    - [`utils.Tuner`](TFLibrary/utils/tuner.py) a light helper class performing grid search of hyper-parameters in a multi-GPU settings.
 
 * [`Bandit`](TFLibrary/Bandits/bandits.py) multi-armed bandit.
 
