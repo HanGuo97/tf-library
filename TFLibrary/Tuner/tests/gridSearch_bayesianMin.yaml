@@ -19,15 +19,17 @@
   maxExperiments: 10
   maxParallelExperiments: 2
   reduceOp: min
+  optimizerArgs:
+    n_initial_points: 5
   paramSpace:
     bayesianArg1:
       type: integer
       low: 1
-      high: 3
+      high: 10
     bayesianArg2:
       type: integer
-      low: 0
-      high: 3
+      low: -1
+      high: 17
     bayesianArg3:
       type: real
       low: -10
