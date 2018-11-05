@@ -1,7 +1,7 @@
-"""
-Need to make sure Target indices match Source indices
+"""Similar to `iterator_utils.py` except we are reading from generator
+dataset where the outputs are vectors directly not text sequences.
 
-"""
+Need to make sure Target indices match Source indices"""
 
 
 import collections
@@ -104,8 +104,10 @@ def get_pairwise_classification_iterator(
             # these have unknown-length vectors.  The last two entries are
             # the source and target row sizes; these are scalars.
             padded_shapes=(
-                tf.TensorShape([None, None]),  # src_1
-                tf.TensorShape([None, None]),  # src_2
+                tf.TensorShape(  # src_1 = [sequence_len, num_units]
+                    [None, src_dataset_1.output_shapes.as_list()[-1]]),
+                tf.TensorShape(  # src_2 = [sequence_len, num_units]
+                    [None, src_dataset_2.output_shapes.as_list()[-1]]),
                 tf.TensorShape([]),  # tgt
                 tf.TensorShape([]),  # src_1_len
                 tf.TensorShape([]),  # src_2_len
