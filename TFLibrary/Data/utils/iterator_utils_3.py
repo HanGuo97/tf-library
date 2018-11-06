@@ -26,7 +26,7 @@ def get_pairwise_classification_iterator(
         tgt_vocab_table,
         batch_size,
         random_seed,
-        src_max_len=None,
+        src_len_axis,
         num_parallel_calls=4,
         output_buffer_size=None,
         skip_count=None,
@@ -35,13 +35,6 @@ def get_pairwise_classification_iterator(
         shuffle=True,
         repeat=False,
         reshuffle_each_iteration=True):
-    
-    if (src_dataset_1.output_shapes.ndims != 2 and
-            src_dataset_2.output_shapes.ndims != 2):
-        raise ValueError(
-            "`src_dataset_1` and `src_dataset_2` must have ndims = 2 "
-            "found %d and %d" % (src_dataset_1.output_shapes.ndims,
-                                 src_dataset_2.output_shapes.ndims))
 
     if not output_buffer_size:
         output_buffer_size = batch_size * 1000
@@ -65,14 +58,6 @@ def get_pairwise_classification_iterator(
                                tf.size(src_2) > 0),
                 tf.size(tgt) > 0)))
 
-    # not target max len because this is classification
-    if src_max_len:
-        src_tgt_dataset = src_tgt_dataset.map(
-            lambda src_1, src_2, tgt: (
-                src_1[:src_max_len], src_2[:src_max_len], tgt),
-            num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
-
-
     # Convert the word strings to ids. Word strings that are not in the
     # vocab get the lookup table's default_value integer.
     src_tgt_dataset = src_tgt_dataset.map(
@@ -81,15 +66,15 @@ def get_pairwise_classification_iterator(
             tf.cast(tgt_vocab_table.lookup(tgt), tf.int32)),
         num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
 
-    
     # Add in sequence lengths.
     # target lengths are redundant, but kept
     # for consistency
     src_tgt_dataset = src_tgt_dataset.map(
         lambda src_1, src_2, tgt: (
             src_1, src_2, tgt,
-            # [sequence_length, num_units]
-            tf.shape(src_1)[0], tf.shape(src_2)[0], tf.size(tgt)),
+            tf.shape(src_1)[src_len_axis],
+            tf.shape(src_2)[src_len_axis],
+            tf.size(tgt)),
         num_parallel_calls=num_parallel_calls).prefetch(output_buffer_size)
 
     if repeat:
@@ -104,10 +89,8 @@ def get_pairwise_classification_iterator(
             # these have unknown-length vectors.  The last two entries are
             # the source and target row sizes; these are scalars.
             padded_shapes=(
-                tf.TensorShape(  # src_1 = [sequence_len, num_units]
-                    [None, src_dataset_1.output_shapes.as_list()[-1]]),
-                tf.TensorShape(  # src_2 = [sequence_len, num_units]
-                    [None, src_dataset_2.output_shapes.as_list()[-1]]),
+                src_dataset_1.output_shapes,
+                src_dataset_2.output_shapes,
                 tf.TensorShape([]),  # tgt
                 tf.TensorShape([]),  # src_1_len
                 tf.TensorShape([]),  # src_2_len
