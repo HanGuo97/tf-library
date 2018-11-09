@@ -1,5 +1,6 @@
 import os
 import copy
+import warnings
 import oyaml as yaml
 from tqdm import tqdm
 from collections import namedtuple
@@ -75,7 +76,8 @@ class HparamOptimizer(object):
                  executable=None,
                  executable_file=None,
                  evaluation_func=None,
-                 print_command=False):
+                 print_command=False,
+                 skip_duplicates=True):
         """Create a Optimizer
 
         Args:
@@ -98,6 +100,13 @@ class HparamOptimizer(object):
                 The function to be called after executing
                 the tunee to collect evaluation observations
                 in arbitrary structure
+            skip_duplicates:
+                Boolean
+                Skip duplicate experiments. In some optimization
+                settings, querying multiple points simultaneously
+                (e.g. MultiGPU Gaussian Processes) can lead to
+                duplicate experiments. Set to True if these
+                duplicate experiments are skipped.
         """
         if gpus and not isinstance(gpus, (list, tuple)):
             raise TypeError("`gpus` must be list or tuple")
@@ -134,9 +143,14 @@ class HparamOptimizer(object):
         self._executable = executable
         self._print_command = print_command
         self._evaluation_func = evaluation_func
+        self._skip_duplicates = skip_duplicates
 
         # `histories` caches the evaluation histories
         self._histories = []
+
+        # `experiment_histories` cache previous experiments
+        # so that duplicate experiments can be dropped
+        self._experiment_histories = []
 
         # `runner` is used for executing experiments
         self._runner = None
@@ -235,17 +249,19 @@ class HparamOptimizer(object):
     def _execute_and_evaluate(self, hparams):
         """Execute and Evaluate Hparams, potentially in parallel."""
         if self.max_parallel is None:
-            if not isinstance(self._runner, runner_ops.BasicRunner):
-                raise TypeError("runner must be `BasicRunner`")
+            raise NotImplementedError("No Support for `_skip_duplicates`")
+            # if not isinstance(self._runner, runner_ops.BasicRunner):
+            #     raise TypeError("runner must be `BasicRunner`")
 
-            # Insert `hparams` into `_executable`
-            experiment = utils._create_experiment(
-                executable=self._executable,
-                hparams_instance=hparams)
+            # # Insert `hparams` into `_executable`
+            # experiment = utils._create_experiment(
+            #     executable=self._executable,
+            #     hparams_instance=hparams)
 
-            # Run and Evaluate
-            self._runner.run(experiment)
-            return self._evaluation_func(hparams)
+            # # Run and Evaluate
+            # self._runner.run(experiment)
+            # self._experiment_histories.append(experiment)
+            # return self._evaluation_func(hparams)
 
         else:
             if not isinstance(self._runner, runner_ops.SyncMultiGPURunner):
@@ -259,7 +275,26 @@ class HparamOptimizer(object):
                 for hparam in hparams]
 
             # Run and Evaluate
-            self._runner.run(experiments)
+            if self._skip_duplicates:
+                num_experiments = len(experiments)
+                # Remove duplicates within the batch
+                # WARNING: This operation will **NOT** preserve the order
+                experiments = misc_utils.unique_nested_lists(experiments)
+                experiments = [  # Remove duplicates globally
+                    experiment for experiment in experiments
+                    if experiment not in self._experiment_histories]
+                
+                num_unique_experiments = len(experiments)
+                if num_unique_experiments < num_experiments:
+                    warnings.warn(
+                        "There exist duplicate experiments, and they will "
+                        "be skipped, reducing experiments from %d --> %d"
+                        % (num_experiments, num_unique_experiments))
+
+            if experiments:  # When having no unique experiments
+                self._runner.run(experiments)
+                self._experiment_histories.extend(experiments)
+
             return [self._evaluation_func(hparam) for hparam in hparams]
 
     def tune(self):
@@ -346,7 +381,6 @@ class HparamOptimizer(object):
                 (optimizer_B, reduce_func_B, max_experiments_B) = (
                     _build_optimizer_from_config(copy.deepcopy(config_B)))
                 optimizer_Bs.append(optimizer_B)
-
 
             for j in range(0, max_experiments_B, max_parallel_B):
                 # `max_experiments_B - j` is the remaining experiments

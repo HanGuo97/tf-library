@@ -2,8 +2,8 @@ import os
 import shutil
 from glob import glob
 import tensorflow as tf
-import runners as runner_ops
 from TFLibrary.utils import misc_utils
+from TFLibrary.Tuner import runners as runner_ops
 
 
 LOGDIR = "./TunerTest"

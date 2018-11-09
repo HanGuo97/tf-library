@@ -1,8 +1,8 @@
 import oyaml as yaml
 import tensorflow as tf
-import optimizers as optimizer_ops
 from collections import OrderedDict
 from skopt.space import space as skopt_space
+from TFLibrary.Tuner import optimizers as optimizer_ops
 
 
 def get_example_config():
@@ -53,8 +53,8 @@ class OptimizersTest(tf.test.TestCase):
 
         # Manually created the dimensions
         expected_params = [
-            skopt_space.Integer(low=1, high=3),
-            skopt_space.Integer(low=0, high=3),
+            skopt_space.Integer(low=1, high=10),
+            skopt_space.Integer(low=-1, high=17),
             skopt_space.Real(low=-10, high=7.5),
             skopt_space.Real(low=0, high=3),
             skopt_space.Categorical(

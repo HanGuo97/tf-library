@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import os
 import sys
 import pickle
+import itertools
 import subprocess
 from time import time
 from copy import deepcopy
@@ -59,6 +60,14 @@ def merge_ordered_dicts(*dict_args):
     for dictionary in dict_args:
         result.update(dictionary)
     return result
+
+
+def unique_nested_lists(nested_lists):
+    # https://stackoverflow.com/questions/2213923/python-removing-duplicates-from-a-list-of-lists
+    nested_lists.sort()
+    return list(
+        nested_lists for nested_lists, _
+        in itertools.groupby(nested_lists))
 
 
 def unique_ordered_list(seq):
