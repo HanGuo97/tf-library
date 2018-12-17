@@ -279,6 +279,8 @@ class HparamOptimizer(object):
                 num_experiments = len(experiments)
                 # Remove duplicates within the batch
                 # WARNING: This operation will **NOT** preserve the order
+                # However, as the order of `hparams` is not changed,
+                # the evaluated results to be returned have the original order
                 experiments = misc_utils.unique_nested_lists(experiments)
                 experiments = [  # Remove duplicates globally
                     experiment for experiment in experiments
