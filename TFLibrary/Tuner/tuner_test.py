@@ -1,4 +1,5 @@
 import os
+import skopt
 import shutil
 import oyaml as yaml
 from glob import glob
@@ -139,8 +140,12 @@ class TunerTest(tf.test.TestCase):
                 # the number of observations must equal `maxExperiments`
                 # for each BayesianOpt, because observations for duplicate
                 # entries are still valid
+                # Note that: we need to use `maxExperiments` to some high
+                # numbers like 30, and `n_initial_points` to some high
+                # numbers like 15 (15 > 9), because otherwise it will be
+                # hard to catch some less obvious errors.
                 for i in range(len(observation_histories[1])):
-                    self.assertEqual(len(observation_histories[1][i]), 15)
+                    self.assertEqual(len(observation_histories[1][i]), 30)
 
                 shutil.rmtree(LOGDIR)
 
@@ -203,6 +208,15 @@ class TunerTest(tf.test.TestCase):
                  feedback_histories,
                  observation_histories) = opt.tune()
 
+                # Dump the tuner outputs, which can be
+                # used to inspect internal outputs and
+                # help debugging in general
+                skopt.dump(
+                    [actual_outputs_2,
+                     feedback_histories,
+                     observation_histories],
+                    os.path.join(LOGDIR, "TunerOutputs.pkl"))
+                
                 actual_outputs_1 = [
                     misc_utils.read_text_file(fname)[0]
                     for fname in glob("TunerTest/*.log")]
@@ -215,6 +229,21 @@ class TunerTest(tf.test.TestCase):
                                  sorted(list(actual_counter.keys())))
 
                 expected_outputs_2 = _compute_expected_value()
+                # Note that there are chances this assertion will fail
+                # but this does not necessarily indicate the tuner is behaving
+                # wrong. The reason is: the there are duplicate entries,
+                # the observations from the last duplicate entry will override
+                # the observations from earlier entry, and for this test,
+                # `skip_duplicates` was set to False. Thus, if the maximum
+                # happens to be in previous duplicate entry,
+                # `expected_outputs_2` will fail to read the file as it was
+                # overwritten. However, tuner keeps track of the entire
+                # history, so it will outputs the global
+                # minimum. This can be fixed by using <= instead of == in
+                # the below assertion. And note that `actual_outputs_2` must
+                # be strictly higher than `expected_outputs_2` in all
+                # scenarios. Also, because the config here use real values,
+                # chances of duplicates are low, so not a huge problem.
                 self.assertEqual(expected_outputs_2, actual_outputs_2)
                 self.assertEqual(len(observation_histories[0]), 72)
                 self.assertEqual(len(observation_histories[1]), 72)

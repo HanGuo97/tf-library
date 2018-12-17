@@ -9,11 +9,11 @@
     gridArg2: [0.001, 0.0005, 0.0001]
 
 - optimizerType: bayesianMin
-  maxExperiments: 15
+  maxExperiments: 30
   maxParallelExperiments: 3
   reduceOp: min
   optimizerArgs:
-    n_initial_points: 7
+    n_initial_points: 15
   paramSpace:
     # High chances of querying duplicate points
     bayesianArg1:
