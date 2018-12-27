@@ -154,12 +154,14 @@ class DataReaderTest(tf.test.TestCase):
 
         sequence_1_sentence_to_index = (
             sequence_1_h5py_data.get("sentence_to_index").value)
-        assert sequence_1_sentence_to_index.shape == (1,)
+        # assert sequence_1_sentence_to_index.shape == (1,)
+        self.assertEqual(sequence_1_sentence_to_index.shape, (1,))
         sequence_1_sent2idx = eval(sequence_1_sentence_to_index[0])
 
         sequence_2_sentence_to_index = (
             sequence_2_h5py_data.get("sentence_to_index").value)
-        assert sequence_2_sentence_to_index.shape == (1,)
+        # assert sequence_2_sentence_to_index.shape == (1,)
+        self.assertEqual(sequence_2_sentence_to_index.shape, (1,))
         sequence_2_sent2idx = eval(sequence_2_sentence_to_index[0])
 
         # Ideally, `sequence_?_indices` should be [0, 1, ..., N]
@@ -189,8 +191,8 @@ class DataReaderTest(tf.test.TestCase):
             mask = np.unique(np.nonzero(computed_embs)[1])
             computed_embs = computed_embs[:, mask, :]
             
-            assert (sequence_1_embs[idx] == computed_embs).all()
-
+            # assert (sequence_1_embs[idx] == computed_embs).all()
+            self.assertAllEqual(sequence_1_embs[idx], computed_embs)
 
         for idx in sequence_2_indices:
             computed_embs = source_2s[idx]
@@ -202,9 +204,11 @@ class DataReaderTest(tf.test.TestCase):
             mask = np.unique(np.nonzero(computed_embs)[1])
             computed_embs = computed_embs[:, mask, :]
             
-            assert (sequence_2_embs[idx] == computed_embs).all()
+            # assert (sequence_2_embs[idx] == computed_embs).all()
+            self.assertAllEqual(sequence_2_embs[idx], computed_embs)
 
-        assert targets == [label_vocab.index(l) for l in labels]
+        # assert targets == [label_vocab.index(l) for l in labels]
+        self.assertEqual(targets, [label_vocab.index(l) for l in labels])
 
 
 if __name__ == "__main__":
