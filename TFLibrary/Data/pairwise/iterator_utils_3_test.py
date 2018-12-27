@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import lookup_ops
 from TFLibrary.utils import misc_utils
-from TFLibrary.Data.utils import iterator_utils_3
+from TFLibrary.Data.pairwise import iterator_utils_3
 from constants import (CACHED_ELMO_NUM_ELEMENTS,
                        CACHED_ELMO_NUM_UNITS,
                        DATA_BUFFER_MULTIPLIER,
