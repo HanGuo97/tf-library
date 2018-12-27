@@ -8,10 +8,6 @@ import tensorflow as tf
 from tensorflow.python.ops import lookup_ops
 from TFLibrary.utils import misc_utils
 from TFLibrary.Data.pairwise import iterator_utils_3
-from constants import (CACHED_ELMO_NUM_ELEMENTS,
-                       CACHED_ELMO_NUM_UNITS,
-                       DATA_BUFFER_MULTIPLIER,
-                       DATA_NUM_PARALLEL_CALLS)
 
 # `iterator_utils_3` is used in settings where the source
 # datasets are pre-computed sequence embeddings, e.g.
@@ -29,7 +25,10 @@ from constants import (CACHED_ELMO_NUM_ELEMENTS,
 # mapping sentence to index. This data format comes from Allennlp.ELMo.
 # Unfortunately the dataset is too big to be saved in this repo, so it's
 # kept separate.
-
+CACHED_ELMO_NUM_ELEMENTS = 3
+CACHED_ELMO_NUM_UNITS = 1024
+DATA_BUFFER_MULTIPLIER = 100
+DATA_NUM_PARALLEL_CALLS = 10
 TEST_FNAME = "/nlp/han/DLResearch/DATA/TextClassifDataELMO/RTE-30K/train"
 
 
