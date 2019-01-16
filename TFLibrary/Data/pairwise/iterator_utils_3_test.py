@@ -180,6 +180,15 @@ class DataReaderTest(tf.test.TestCase):
         # mean that index X and idex J will refer to the same string,
         # the non-determinism in ELMO means that they will receive slightly
         # different embedding (maybe?).
+        
+        # `for idx in range(len(sequence_1_indices))` is equivalent to
+        # `for val in sequence_1_indices`, because of the duplicates.
+        # This can be tested by running
+        #
+        # ```python
+        # for idx, val in enumerate(sequence_1_indices):
+        #     assert(sequence_1_indices[idx] == sequence_1_indices[val])
+        # ```
         for idx in sequence_1_indices:
             computed_embs = source_1s[idx]
             # `np.nonzero(computed_embs)` is zero-padded,
