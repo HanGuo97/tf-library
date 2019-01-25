@@ -81,10 +81,16 @@ def depreciation_warning(cls):
 
 
 @contextmanager
-def calculate_time(tag):
+def calculate_time(tag, printer=None):
+    if printer is None:
+        printer = print
+    
+    if not callable(printer):
+        raise TypeError("`printer` must be callable")
+
     start_time = time()
     yield
-    print("%s: " % tag, time() - start_time)
+    printer("%s: %.5f" % (tag, time() - start_time))
 
 
 @contextmanager
