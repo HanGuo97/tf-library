@@ -12,5 +12,6 @@ tensor2tensor
 numpy
 pandas
 oyaml
+absl-py
 scikit-optimize
 tensorflow-hub
