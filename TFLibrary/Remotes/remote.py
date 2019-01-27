@@ -4,7 +4,7 @@
 import zmq
 from absl import logging
 from TFLibrary.Remotes import remote_base
-from TFLibrary.Remotes import remote_utils
+from TFLibrary.Remotes import utils as remote_utils
 from TFLibrary.utils.misc_utils import calculate_time
 logging.set_verbosity(logging.DEBUG)
 
@@ -36,6 +36,7 @@ class ZMQServer(remote_base.RemoteServer):
                 logging.info("Connected to %s" % messages[1])
                 hello_messages = self._get_hello_messages()
                 self._send(hello_messages)
+                continue
 
             # Messages not to be kwarged-dictionary so that
             # metric calls are more reliable
