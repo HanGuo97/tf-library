@@ -2,7 +2,9 @@
    how-to-work-with-the-zeromq-messaging-library"""
 
 import zmq
+from zmq import ssh
 from absl import logging
+from overrides import overrides
 from TFLibrary.Remotes import remote_base
 from TFLibrary.Remotes import utils as remote_utils
 from TFLibrary.utils.misc_utils import calculate_time
@@ -128,3 +130,49 @@ class ZMQClient(remote_base.RemoteClient):
 
     def _get_hello_messages(self):
         return [remote_utils.HELLO_MSG, self.identity]
+
+
+class ZMQSSHTunnelClient(ZMQClient):
+    """ZeroMQ-based Client but connect via SSH Tunnel
+
+        Details: https://pyzmq.readthedocs.io/en/latest/ssh.html
+        Codes: https://github.com/zeromq/pyzmq/blob/master/zmq/ssh/tunnel.py
+    """
+    
+    def __init__(self,
+                 address,
+                 server,
+                 password=None,
+                 identity="SshTunnelClient"):
+
+        self._server = server
+        self._password = password
+        super(ZMQSSHTunnelClient, self).__init__(
+            address=address, identity=identity)
+
+    @overrides
+    def connect(self):
+        # ZeroMQ Context
+        context = zmq.Context()
+
+        # Define the socket using the "Context"
+        socket = context.socket(zmq.REQ)
+
+        # --- Connect via SSH Tunnel ---
+        ssh.tunnel_connection(
+            socket, self._address,
+            server=self._server,
+            password=self._password)
+
+        logging.info("Connecting to %s" % self._address)
+
+        self._context = context
+        self._socket = socket
+
+        # First Send a Hello message to ensure the
+        # connection is established
+        hello_messages = self._get_hello_messages()
+        self._send(hello_messages)
+        messages = self._receive()
+        if self._is_hello_messages(messages):
+            logging.info("Connected to %s" % messages[1])
