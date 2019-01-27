@@ -21,8 +21,8 @@ import subprocess
 
 import tensorflow as tf
 
-from core_lib.Metrics.utils import bleu
-from core_lib.Metrics.utils import rouge
+from TFLibrary.Metrics.utils import bleu
+from TFLibrary.Metrics.utils import rouge
 
 
 __all__ = ["evaluate"]
