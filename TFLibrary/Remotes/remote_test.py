@@ -18,11 +18,19 @@ class MetricsTest(absltest.TestCase):
     def testZMQServerClient(self):
         func = metrics.SentenceROUGE()
         client = remote.ZMQClient(address="tcp://localhost:3000")
+
         self.assertScoresEqual(
             func=func,
             client=client,
             referenece_fname="target.0.txt",
             prediction_fname="prediction.0.txt",
+            print_score=True)
+
+        self.assertScoresEqual(
+            func=func,
+            client=client,
+            referenece_fname="target.1.txt",
+            prediction_fname="prediction.1.txt",
             print_score=True)
 
     def assertScoresEqual(self,
@@ -45,7 +53,7 @@ class MetricsTest(absltest.TestCase):
             reference=read_text_file_utf8(referenece_fname)[0])
 
         if print_score:
-            print("%.1f " % actual, end="", flush=True)
+            print("%.3f " % actual, flush=True)
 
         if expect_equal:
             self.assertEqual(expected, actual)
