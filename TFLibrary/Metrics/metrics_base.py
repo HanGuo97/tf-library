@@ -31,7 +31,7 @@ class SentenceMetrics(Metrics):
         return self._call(prediction=prediction,
                           reference=reference)
 
-    def _call(self, reference, prediction):
+    def _call(self, prediction, reference):
         raise NotImplementedError
 
 
@@ -73,5 +73,5 @@ class CorpusMetrics(Metrics):
         return self._call(predictions=predictions,
                           references=references)
 
-    def _call(self, references, predictions):
+    def _call(self, predictions, references):
         raise NotImplementedError
