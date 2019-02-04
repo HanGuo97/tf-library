@@ -11,57 +11,24 @@ from zmq.eventloop.ioloop import IOLoop
 from zmq.eventloop.zmqstream import ZMQStream
 
 from TFLibrary.NewTuner import utils
+from TFLibrary.NewTuner import servers
 
 NBR_CLIENTS = 10
 NBR_WORKERS = 3
 ENCODE_METHOD = "ascii"
 
-ServerMessages = namedtuple(
-    "ServerMessages",
-    ("worker_address",
+ServerEnvelop = namedtuple(
+    "ServerEnvelop",
+    ("server_address",
      "client_address",
-     "reply"))
+     "server_identity",
+     "contents"))
 
-ClientMessages = namedtuple(
-    "ClientMessages",
-    ("client_address", "request"))
-
-
-def encode(string):
-    return string.encode(ENCODE_METHOD)
-
-
-def decode(string):
-    return string.decode(ENCODE_METHOD)
-
-
-def worker_thread(worker_url, i):
-    """ Worker using REQ socket to do LRU routing """
-    context = zmq.Context.instance()
-
-    socket = context.socket(zmq.REQ)
-
-    # set worker identity
-    socket.identity = (u"Worker-%d" % (i)).encode('ascii')
-
-    socket.connect(worker_url)
-
-    # Tell the broker we are ready for work
-    socket.send(utils.HELLO_MESSAGE)
-
-    try:
-        while True:
-
-            address, empty, request = socket.recv_multipart()
-
-            print("%s: %s\n" % (socket.identity.decode('ascii'),
-                                utils.deserialize_pyobj(request)), end='')
-
-            socket.send_multipart([address, utils.EMPTY, utils.serialize_pyobj('OK')])
-
-    except zmq.ContextTerminated:
-        # context terminated so quit silently
-        return
+ClientEnvelop = namedtuple(
+    "ClientEnvelop",
+    ("client_address",
+     "client_identity",
+     "contents"))
 
 
 def client_thread(client_url, i):
@@ -103,18 +70,28 @@ class LRUQueue(object):
 
     def _handle_backend(self, messages):
         if self.available_workers >= NBR_WORKERS:
-            raise ValueError("Available Workers Wrong")
+            raise ValueError("Available Workers Wrong, %d != %d" % (NBR_CLIENTS, self.available_workers))
 
         # Queue worker address for LRU routing
-        (server_says_hello,
-         server_messages) = self.receive_from_servers(messages)
-        # add worker back to the list of workers
-        self._workers.append(server_messages.worker_address)
+        server_envelop = self.receive_from_servers(messages)
 
         # Third frame is READY or else a client reply address
         # If client reply, send rest back to frontend
-        if not server_says_hello:
-            self.send_to_clients(server_messages)
+        if server_envelop.contents == utils.HELLO_MESSAGE:
+            self.send_to_servers(
+                contents=utils.HELLO_MESSAGE,
+                server_address=server_envelop.server_address,
+                client_address=None)
+
+            return
+        
+        # add worker back to the list of workers
+        self._workers.append(server_envelop.server_address)
+
+        if server_envelop.contents != utils.READY_MESSAGE:
+            self.send_to_clients(
+                contents=server_envelop.contents,
+                client_address=server_envelop.client_address)
 
             self.client_nbr -= 1
 
@@ -128,13 +105,16 @@ class LRUQueue(object):
 
     def _handle_frontend(self, messages):
         # Receive and Process Messages
-        client_messages = self.receive_from_clients(messages)
+        client_envelop = self.receive_from_clients(messages)
+        
         #  Dequeue and drop the next worker address
-        worker_address = self._workers.pop()
+        server_address = self._workers.pop()
+        
         # Route the messages to Servers
         self.send_to_servers(
-            worker_address=worker_address,
-            client_messages=client_messages)
+            contents=client_envelop.contents,
+            server_address=server_address,
+            client_address=client_envelop.client_address)
 
         if self.available_workers == 0:
             # stop receiving until workers become available again
@@ -146,54 +126,61 @@ class LRUQueue(object):
 
         # Now get next client request, route to LRU worker
         # Client request is [address][empty][request]
-        client_addr, empty, request = messages
+        client_address, empty, contents = messages
         utils.assert_empty(empty)
+        contents = utils.deserialize_pyobj(contents)
 
-        return ClientMessages(
-            client_address=client_addr,
-            request=utils.deserialize_pyobj(request))
+        return ClientEnvelop(
+            client_address=client_address,
+            client_identity=None,
+            contents=contents)
 
 
     def receive_from_servers(self, messages):
-        if len(messages) not in [3, 5]:
-            raise ValueError("`len(messages)` should be in [3, 5]")
+        if len(messages) != 5:
+            raise ValueError("`len(messages)` should be 5")
 
         # Queue worker address for LRU routing
-        worker_address, empty, client_address = messages[:3]
+        (server_address, empty,
+         client_address,
+         server_identity,
+         contents) = messages
+        
         utils.assert_empty(empty)
+        contents = utils.deserialize_pyobj(contents)
+        if client_address == utils.EMPTY:
+            if contents not in [utils.HELLO_MESSAGE,
+                                utils.READY_MESSAGE]:
+                raise ValueError(contents)
+            
+            client_address = None
 
-        # Third frame is READY or else a client reply address
-        # If client reply, send rest back to frontend
-        server_says_hello = utils.is_hello_message(client_address)
-        if not server_says_hello:
-            empty, reply = messages[3:]
-            utils.assert_empty(empty)
-        else:
-            reply = None
-
-        return server_says_hello, ServerMessages(
-            worker_address=worker_address,
+        return ServerEnvelop(
+            server_address=server_address,
             client_address=client_address,
-            reply=utils.deserialize_pyobj(reply) if reply else None)
+            server_identity=server_identity,
+            contents=contents)
 
 
-    def send_to_clients(self, server_messages):
-        if not isinstance(server_messages, ServerMessages):
-            raise TypeError
+    def send_to_clients(self, contents, client_address):
+        if client_address is None:
+            raise ValueError("`client_address` is None")
 
         self._frontend.send_multipart([
-            server_messages.client_address, utils.EMPTY,
-            utils.serialize_pyobj(server_messages.reply)])
+            client_address,
+            utils.EMPTY,
+            utils.serialize_pyobj(contents)])
 
-
-    def send_to_servers(self, worker_address, client_messages):
-        if not isinstance(client_messages, ClientMessages):
-            raise TypeError
+    def send_to_servers(self, contents, server_address, client_address):
+        if server_address is None:
+            raise ValueError("`server_address` is None")
 
         self._backend.send_multipart([
-            worker_address, utils.EMPTY,
-            client_messages.client_address, utils.EMPTY,
-            utils.serialize_pyobj(client_messages.request)])
+            server_address,
+            utils.EMPTY,
+            client_address or utils.EMPTY,
+            utils.EMPTY,
+            utils.serialize_pyobj(contents)])
 
 
 def main():
@@ -211,7 +198,9 @@ def main():
 
     # create workers and clients threads
     for i in range(NBR_WORKERS):
-        thread = threading.Thread(target=worker_thread, args=(url_worker, i, ))
+        thread = threading.Thread(target=servers.BasicServer,
+                                  kwargs={"address": url_worker,
+                                          "identity": "server-%d" % i})
         thread.daemon = True
         thread.start()
 

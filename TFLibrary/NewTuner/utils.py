@@ -13,7 +13,8 @@ except AttributeError:
 
 # Empty Deliminator is used by the socket lib, so must be bytes
 EMPTY = b""
-HELLO_MESSAGE = b"READY"
+HELLO_MESSAGE = "HELLO"
+READY_MESSAGE = "READY"
 
 
 def assert_empty(empty):
