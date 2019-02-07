@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Commit SHA: `b2b6ff7f55682a275083c5a740174036cd3ec245`
+# File Path: datasets/tensorflow_datasets/core/api_utils.py
+# Repo: tensorflow/datasets
+# Date copied: Feb 7 2019
+
 """API utilities."""
 
 from __future__ import absolute_import
