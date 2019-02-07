@@ -31,25 +31,6 @@ ClientEnvelop = namedtuple(
      "contents"))
 
 
-def client_thread(client_url, i):
-    """ Basic request-reply client using REQ socket """
-    context = zmq.Context.instance()
-
-    socket = context.socket(zmq.REQ)
-
-    # Set client identity. Makes tracing easier
-    socket.identity = (u"Client-%d" % (i)).encode('ascii')
-
-    socket.connect(client_url)
-
-    #  Send request, get reply
-    socket.send(utils.serialize_pyobj("HELLO"))
-    reply = socket.recv()
-
-    print("%s: %s\n" % (socket.identity.decode('ascii'),
-                        utils.deserialize_pyobj(reply)), end='')
-
-
 class LRUQueue(object):
     """LRUQueue class using ZMQStream/IOLoop for event dispatching"""
 
@@ -107,6 +88,15 @@ class LRUQueue(object):
         # Receive and Process Messages
         client_envelop = self.receive_from_clients(messages)
         
+        # Third frame is READY or else a client reply address
+        # If client reply, send rest back to frontend
+        if client_envelop.contents == utils.HELLO_MESSAGE:
+            self.send_to_clients(
+                contents=utils.HELLO_MESSAGE,
+                client_address=client_envelop.client_address)
+
+            return
+
         #  Dequeue and drop the next worker address
         server_address = self._workers.pop()
         
@@ -121,18 +111,18 @@ class LRUQueue(object):
             self._frontend.stop_on_recv()
 
     def receive_from_clients(self, messages):
-        if len(messages) != 3:
+        if len(messages) != 4:
             raise ValueError("`len(messages)` should be 3")
 
         # Now get next client request, route to LRU worker
-        # Client request is [address][empty][request]
-        client_address, empty, contents = messages
+        # Client request is [address][empty][identity][request]
+        client_address, empty, client_identity, contents = messages
         utils.assert_empty(empty)
         contents = utils.deserialize_pyobj(contents)
 
         return ClientEnvelop(
             client_address=client_address,
-            client_identity=None,
+            client_identity=client_identity,
             contents=contents)
 
 
@@ -198,20 +188,21 @@ def main():
 
     # create workers and clients threads
     for i in range(NBR_WORKERS):
-        thread = threading.Thread(target=servers.BasicServer,
-                                  kwargs={"address": url_worker,
-                                          "identity": "server-%d" % i})
-        thread.daemon = True
-        thread.start()
+        thread_s = threading.Thread(target=servers.BasicServer,
+                                    kwargs={"address": url_worker,
+                                            "identity": "server-%d" % i})
+        thread_s.daemon = True
+        thread_s.start()
 
     for i in range(NBR_CLIENTS):
-        thread_c = threading.Thread(target=client_thread,
-                                    args=(url_client, i, ))
+        thread_c = threading.Thread(target=servers.BasicClient,
+                                    kwargs={"address": url_client,
+                                            "identity": "client-%d" % i})
         thread_c.daemon = True
         thread_c.start()
 
     # create queue with the sockets
-    queue = LRUQueue(backend, frontend)
+    LRUQueue(backend, frontend)
 
     # start reactor
     IOLoop.instance().start()

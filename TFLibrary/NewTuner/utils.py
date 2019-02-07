@@ -17,6 +17,10 @@ HELLO_MESSAGE = "HELLO"
 READY_MESSAGE = "READY"
 
 
+def is_internal_message(message):
+    return message in [EMPTY, HELLO_MESSAGE, READY_MESSAGE]
+
+
 def assert_empty(empty):
     if empty != EMPTY:
         raise ValueError("Empty should be empty")
