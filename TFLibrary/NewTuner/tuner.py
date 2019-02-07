@@ -34,15 +34,20 @@ ClientEnvelop = namedtuple(
 class LRUQueue(object):
     """LRUQueue class using ZMQStream/IOLoop for event dispatching"""
 
-    def __init__(self, backend_socket, frontend_socket):
+    def __init__(self, backend_socket, frontend_socket, identity="LRUQueue"):
         self._workers = []
         self.client_nbr = NBR_CLIENTS
 
         self._backend = ZMQStream(backend_socket)
         self._frontend = ZMQStream(frontend_socket)
         self._backend.on_recv(self._handle_backend)
+        self._identity = identity
 
         self._loop = IOLoop.instance()
+
+    @property
+    def identity(self):
+        return self._identity
 
     @property
     def available_workers(self):
@@ -111,8 +116,16 @@ class LRUQueue(object):
             self._frontend.stop_on_recv()
 
     def receive_from_clients(self, messages):
+        """Receive messages from clients
+
+        Envelop:
+            client_address
+            EMPTY,
+            client_identity,
+            contents
+        """
         if len(messages) != 4:
-            raise ValueError("`len(messages)` should be 3")
+            raise ValueError("`len(messages)` should be 4")
 
         # Now get next client request, route to LRU worker
         # Client request is [address][empty][identity][request]
@@ -127,23 +140,36 @@ class LRUQueue(object):
 
 
     def receive_from_servers(self, messages):
+        """Receive messages from servers
+
+        Envelop:
+            server_address,
+            EMPTY,
+            client_address,
+            server_identity,
+            contents
+        
+        where `client_address` can also be EMPTY is the message
+        is for internal communication only
+        """
         if len(messages) != 5:
             raise ValueError("`len(messages)` should be 5")
 
         # Queue worker address for LRU routing
-        (server_address, empty,
+        (server_address,
+         empty,
          client_address,
          server_identity,
          contents) = messages
-        
+
         utils.assert_empty(empty)
-        contents = utils.deserialize_pyobj(contents)
         if client_address == utils.EMPTY:
-            if contents not in [utils.HELLO_MESSAGE,
-                                utils.READY_MESSAGE]:
-                raise ValueError(contents)
-            
             client_address = None
+
+        contents = utils.deserialize_pyobj(contents)
+        utils.assert_safe_no_receiver(
+            contents=contents,
+            receiver_address=client_address)
 
         return ServerEnvelop(
             server_address=server_address,
@@ -153,23 +179,50 @@ class LRUQueue(object):
 
 
     def send_to_clients(self, contents, client_address):
+        """Send messages to clients
+
+        Envelop:
+            client_address,
+            EMPTY,
+            identity
+            contents
+        """
         if client_address is None:
             raise ValueError("`client_address` is None")
 
         self._frontend.send_multipart([
             client_address,
             utils.EMPTY,
+            utils.serialize_pyobj(self.identity),
             utils.serialize_pyobj(contents)])
 
     def send_to_servers(self, contents, server_address, client_address):
+        """Send messages to servers
+
+        Envelop:
+            server_address,
+            EMPTY,
+            client_address,
+            EMPTY,
+            identity
+            contents
+
+        where `client_address` can also be EMPTY if the message is
+        for internal communication only.
+        """
         if server_address is None:
             raise ValueError("`server_address` is None")
+
+        utils.assert_safe_no_receiver(
+            contents=contents,
+            receiver_address=client_address)
 
         self._backend.send_multipart([
             server_address,
             utils.EMPTY,
             client_address or utils.EMPTY,
             utils.EMPTY,
+            utils.serialize_pyobj(self.identity),
             utils.serialize_pyobj(contents)])
 
 

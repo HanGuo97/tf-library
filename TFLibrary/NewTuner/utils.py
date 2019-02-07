@@ -26,6 +26,17 @@ def assert_empty(empty):
         raise ValueError("Empty should be empty")
 
 
+def assert_safe_no_receiver(contents, receiver_address):
+    # The message is only seen by Router
+    no_receiver = receiver_address is None
+    if is_internal_message(contents) != no_receiver:
+        raise ValueError(
+            "Internal contents should only be sent without receiver, "
+            "likewise, external contents need specified receiver. "
+            "Contents {} Address {}".format(contents, receiver_address))
+
+
+
 def is_hello_message(message):
     return message == HELLO_MESSAGE
 

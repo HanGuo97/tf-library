@@ -91,12 +91,9 @@ class BasicServer(RemoteBase):
         self.start()
 
     def send(self, contents, receiver_address=None):
-        # The message is only seen by Router
-        no_receiver = receiver_address is None
-        if utils.is_internal_message(contents) != no_receiver:
-            raise ValueError(
-                "Internal contents should only be sent without receiver, "
-                "likewise, external contents need specified receiver")
+        utils.assert_safe_no_receiver(
+            contents=contents,
+            receiver_address=receiver_address)
 
         self._socket.send_multipart([
             receiver_address or utils.EMPTY,
@@ -106,11 +103,11 @@ class BasicServer(RemoteBase):
     def receive(self):
         messages = self._socket.recv_multipart()
 
-        # [address][empty][request]
-        if len(messages) != 3:
-            raise ValueError("`len(messages)` should be 3")
+        # [address][empty][identity][request]
+        if len(messages) != 4:
+            raise ValueError("`len(messages)` should be 4")
 
-        sender_address, empty, contents = messages
+        sender_address, empty, _, contents = messages
         utils.assert_empty(empty)
         contents = utils.deserialize_pyobj(contents)
 
@@ -158,16 +155,17 @@ class BasicClient(RemoteBase):
 
     def receive(self):
         messages = self._socket.recv_multipart()
-        # Response is [response]
-        if len(messages) != 1:
-            raise ValueError("`len(messages)` should be 1")
+        # Response is [identity][response]
+        if len(messages) != 2:
+            raise ValueError("`len(messages)` should be 2")
 
-        contents = utils.deserialize_pyobj(messages[0])
+        _, contents = messages
+        contents = utils.deserialize_pyobj(contents)
         return Envelop(contents=contents,
                        sender_address=None)
 
     def request(self):
         # Tell the Router the server is ready
-        self.send(contents=utils.READY_MESSAGE)
+        self.send(contents=b"DUMMY")
         envelop = self.receive()
         logging.info("{}: {}".format(self.identity, envelop.contents))
