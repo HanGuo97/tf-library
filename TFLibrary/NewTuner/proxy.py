@@ -3,263 +3,255 @@
 from __future__ import print_function
 
 import time
-import threading
-from collections import namedtuple
-
-import zmq
+from absl import logging
 from zmq.eventloop.ioloop import IOLoop
 from zmq.eventloop.zmqstream import ZMQStream
-
 from TFLibrary.NewTuner import utils
-from TFLibrary.NewTuner import servers
-
-NBR_CLIENTS = 10
-NBR_WORKERS = 3
-ENCODE_METHOD = "ascii"
-
-ServerEnvelop = namedtuple(
-    "ServerEnvelop",
-    ("server_address",
-     "client_address",
-     "server_identity",
-     "contents"))
-
-ClientEnvelop = namedtuple(
-    "ClientEnvelop",
-    ("client_address",
-     "client_identity",
-     "contents"))
+from TFLibrary.NewTuner import envelops
+logging.set_verbosity(logging.INFO)
 
 
 class LRUQueue(object):
     """LRUQueue class using ZMQStream/IOLoop for event dispatching"""
 
-    def __init__(self, backend_socket, frontend_socket, identity="LRUQueue"):
-        self._workers = []
-        self.client_nbr = NBR_CLIENTS
+    def __init__(self,
+                 backend_socket,
+                 frontend_socket,
+                 identity="LRUQueue"):
 
-        self._backend = ZMQStream(backend_socket)
-        self._frontend = ZMQStream(frontend_socket)
-        self._backend.on_recv(self._handle_backend)
+        loop = IOLoop.instance()
+        backend = ZMQStream(backend_socket)
+        frontend = ZMQStream(frontend_socket)
+        backend.on_recv(self._handle_backend)
+        frontend.on_recv(self._handle_frontend)
+
+        self._loop = loop
+        self._backend = backend
+        self._frontend = frontend
         self._identity = identity
 
-        self._loop = IOLoop.instance()
+        self._results = []
+        self._workers_busy = []
+        self._workers_free = []
+        self._requests_pending = []
+        self._requests_running = []
 
     @property
     def identity(self):
         return self._identity
 
-    @property
-    def available_workers(self):
-        return len(self._workers)
-        """Serialize worker and Client"""
+    def exit(self):
+        # Exit after N messages
+        self._loop.add_timeout(time.time() + 1, self._loop.stop)
+
+    def send_requests_to_servers(self):
+        # Send as many requests to servers as possible
+        # until either no requests left or no available workers
+        while len(self._requests_pending) and len(self._workers_free):
+            # Dequeue and drop the next worker address and request
+            server_address = self._workers_free.pop()
+            client_envelop = self._requests_pending.pop()
+            
+            # Route the messages to Servers
+            self.send_to_servers(
+                header="POST",
+                server_address=server_address,
+                contents=client_envelop.contents)
+
+            # Put them into busy queue
+            self._workers_busy.append(server_address)
+            self._requests_running.append(client_envelop)
+        
 
     def _handle_backend(self, messages):
-        if self.available_workers >= NBR_WORKERS:
-            raise ValueError("Available Workers Wrong, %d != %d" % (NBR_CLIENTS, self.available_workers))
+        """Handle Backend
 
+        Cases:
+            header: HELLO
+                The server sent a message to verify connection.
+                Reply the server with HELLO.
+
+            header: READY
+                The server is ready for receiving workloads.
+                Append the worker into the queue.
+
+            header: POST:
+                The server finished its last work and sent the
+                results. It also signals it's ready for new works.
+                Put the results into the queue, and append the
+                workder into the queue.
+
+        """
         # Queue worker address for LRU routing
-        server_envelop = self.receive_from_servers(messages)
+        (server_address,
+         server_envelop) = self.receive_from_servers(messages)
 
-        # Third frame is READY or else a client reply address
-        # If client reply, send rest back to frontend
-        if server_envelop.contents == utils.HELLO_MESSAGE:
-            self.send_to_servers(
-                contents=utils.HELLO_MESSAGE,
-                server_address=server_envelop.server_address,
-                client_address=None)
+        # Name
+        server_info = "{} ({})".format(
+            server_envelop.identity, server_address)
+
+        if server_envelop.header == "HELLO":
+            logging.info("Server {} Says HELLO".format(server_info))
+            self.send_to_servers(header="HELLO",
+                                 server_address=server_address)
 
             return
-        
+
+        if server_envelop.header == "READY":
+            logging.info("Server {} is READY".format(server_info))
+
+        if server_envelop.header == "POST":
+            logging.info("Server {} finished".format(server_info))
+            self._results.append({"contents": server_envelop.contents})
+
+
         # add worker back to the list of workers
-        self._workers.append(server_envelop.server_address)
-
-        if server_envelop.contents != utils.READY_MESSAGE:
-            self.send_to_clients(
-                contents=server_envelop.contents,
-                client_address=server_envelop.client_address)
-
-            self.client_nbr -= 1
-
-            if self.client_nbr == 0:
-                # Exit after N messages
-                self._loop.add_timeout(time.time() + 1, self._loop.stop)
-
-        if self.available_workers == 1:
-            # on first recv, start accepting frontend messages
-            self._frontend.on_recv(self._handle_frontend)
+        self._workers_free.append(server_address)
+        # Send requests if possible
+        self.send_requests_to_servers()
 
     def _handle_frontend(self, messages):
+        """Handle Frontend
+
+        Cases:
+            header: HELLO
+                The client tries to verify connection.
+                Reply HELLO to the client.
+
+            header: GET
+                The client wants to query status.
+                Reply with corresponding status.
+
+            header: POST
+                The client makes requests.
+                Add the requests into queue.
+
+        """
         # Receive and Process Messages
-        client_envelop = self.receive_from_clients(messages)
+        (client_address,
+         client_envelop) = self.receive_from_clients(messages)
+
+        # Name
+        client_info = "{} ({})".format(
+            client_envelop.identity, client_address)
         
-        # Third frame is READY or else a client reply address
-        # If client reply, send rest back to frontend
-        if client_envelop.contents == utils.HELLO_MESSAGE:
+        if client_envelop.header == "HELLO":
+            logging.info("Client {} Says HELLO".format(client_info))
             self.send_to_clients(
-                contents=utils.HELLO_MESSAGE,
-                client_address=client_envelop.client_address)
+                header="HELLO",
+                client_address=client_address)
 
             return
 
-        #  Dequeue and drop the next worker address
-        server_address = self._workers.pop()
-        
-        # Route the messages to Servers
-        self.send_to_servers(
-            contents=client_envelop.contents,
-            server_address=server_address,
-            client_address=client_envelop.client_address)
+        if client_envelop.header == "GET":
+            logging.info("Client {} sent GET".format(client_info))
+            self.send_to_clients(
+                header=client_envelop.header,
+                client_address=client_address,
+                contents={
+                    "# Results": len(self._results),
+                    "# Free Workers": len(self._workers_free),
+                    "# Busy Workers": len(self._workers_busy),
+                    "# Pending Requests": len(self._requests_pending),
+                    "# Running Requests": len(self._requests_running),
+                })
 
-        if self.available_workers == 0:
-            # stop receiving until workers become available again
-            self._frontend.stop_on_recv()
+        if client_envelop.header == "POST":
+            logging.info("Client {} sent POST".format(client_info))
+            self._requests_pending.append(client_envelop)
+            self.send_to_clients(
+                header=client_envelop.header,
+                client_address=client_address,
+                contents="Request {} Received".format(
+                    client_envelop.contents))
+
+
+        # Send requests if possible
+        self.send_requests_to_servers()
 
     def receive_from_clients(self, messages):
         """Receive messages from clients
 
-        Envelop:
+        Received Messages:
             client_address
             EMPTY,
-            client_identity,
-            contents
+            ClientEnvelop,
         """
-        if len(messages) != 4:
-            raise ValueError("`len(messages)` should be 4")
+        if len(messages) != 3:
+            raise ValueError("`len(messages)` should be 3")
 
-        # Now get next client request, route to LRU worker
-        # Client request is [address][empty][identity][request]
-        client_address, empty, client_identity, contents = messages
+        client_address, empty, serialied_envelop = messages
         utils.assert_empty(empty)
-        contents = utils.deserialize_pyobj(contents)
+        client_envelop = envelops.deserialize_client_envelop(
+            serialied_envelop=serialied_envelop)
 
-        return ClientEnvelop(
-            client_address=client_address,
-            client_identity=client_identity,
-            contents=contents)
+        return client_address, client_envelop
 
 
     def receive_from_servers(self, messages):
         """Receive messages from servers
 
-        Envelop:
+        Received Messages:
             server_address,
             EMPTY,
-            client_address,
-            server_identity,
-            contents
+            ServerEnvelop
         
         where `client_address` can also be EMPTY is the message
         is for internal communication only
         """
-        if len(messages) != 5:
-            raise ValueError("`len(messages)` should be 5")
+        if len(messages) != 3:
+            raise ValueError("`len(messages)` should be 3")
 
         # Queue worker address for LRU routing
-        (server_address,
-         empty,
-         client_address,
-         server_identity,
-         contents) = messages
-
+        server_address, empty, serialied_envelop = messages
         utils.assert_empty(empty)
-        if client_address == utils.EMPTY:
-            client_address = None
+        server_envelop = envelops.deserialize_server_envelop(
+            serialied_envelop=serialied_envelop)
 
-        contents = utils.deserialize_pyobj(contents)
-        utils.assert_safe_no_receiver(
-            contents=contents,
-            receiver_address=client_address)
-
-        return ServerEnvelop(
-            server_address=server_address,
-            client_address=client_address,
-            server_identity=server_identity,
-            contents=contents)
+        return server_address, server_envelop
 
 
-    def send_to_clients(self, contents, client_address):
+    def send_to_clients(self, header, client_address, contents=None):
         """Send messages to clients
 
-        Envelop:
+        Messages to Send:
             client_address,
             EMPTY,
-            identity
-            contents
+            ClientEnvelop
         """
         if client_address is None:
-            raise ValueError("`client_address` is None")
+            raise ValueError("`client_address` cannot be None")
 
-        self._frontend.send_multipart([
-            client_address,
-            utils.EMPTY,
-            utils.serialize_pyobj(self.identity),
-            utils.serialize_pyobj(contents)])
+        envelop = envelops.make_client_envelop(
+            header=header,
+            contents=contents,
+            identity=self.identity,
+            serialize=True)
 
-    def send_to_servers(self, contents, server_address, client_address):
+        self._frontend.send_multipart([client_address,
+                                       utils.EMPTY,
+                                       envelop])
+
+    def send_to_servers(self, header, server_address, contents=None):
         """Send messages to servers
 
-        Envelop:
+        Messages to Send:
             server_address,
             EMPTY,
-            client_address,
-            EMPTY,
-            identity
-            contents
+            ServerEnvelop
 
         where `client_address` can also be EMPTY if the message is
         for internal communication only.
         """
         if server_address is None:
-            raise ValueError("`server_address` is None")
+            raise ValueError("`server_address` cannot None")
 
-        utils.assert_safe_no_receiver(
+        envelop = envelops.make_server_envelop(
+            header=header,
             contents=contents,
-            receiver_address=client_address)
+            identity=self.identity,
+            serialize=True)
 
-        self._backend.send_multipart([
-            server_address,
-            utils.EMPTY,
-            client_address or utils.EMPTY,
-            utils.EMPTY,
-            utils.serialize_pyobj(self.identity),
-            utils.serialize_pyobj(contents)])
-
-
-def main():
-    """main method"""
-
-    url_worker = "ipc://backend.ipc"
-    url_client = "ipc://frontend.ipc"
-
-    # Prepare our context and sockets
-    context = zmq.Context()
-    frontend = context.socket(zmq.ROUTER)
-    frontend.bind(url_client)
-    backend = context.socket(zmq.ROUTER)
-    backend.bind(url_worker)
-
-    # create workers and clients threads
-    for i in range(NBR_WORKERS):
-        thread_s = threading.Thread(target=servers.BasicServer,
-                                    kwargs={"address": url_worker,
-                                            "identity": "server-%d" % i})
-        thread_s.daemon = True
-        thread_s.start()
-
-    for i in range(NBR_CLIENTS):
-        thread_c = threading.Thread(target=servers.BasicClient,
-                                    kwargs={"address": url_client,
-                                            "identity": "client-%d" % i})
-        thread_c.daemon = True
-        thread_c.start()
-
-    # create queue with the sockets
-    LRUQueue(backend, frontend)
-
-    # start reactor
-    IOLoop.instance().start()
-
-
-if __name__ == "__main__":
-    main()
+        self._backend.send_multipart([server_address,
+                                      utils.EMPTY,
+                                      envelop])

@@ -1,7 +1,10 @@
 import zmq
+import time
 from zmq import ssh
 from absl import logging
 from TFLibrary.NewTuner import utils
+from TFLibrary.NewTuner import envelops
+
 from overrides import overrides
 from collections import namedtuple
 logging.set_verbosity(logging.INFO)
@@ -13,13 +16,19 @@ class RemoteBase(object):
     """Metrics Server"""
     def __init__(self,
                  address,
+                 socket_type,
                  ssh_server=None,
                  ssh_password=None,
                  identity="server"):
 
         self._address = address
+        self._socket_type = socket_type
+
+        # SSH Tuneling
         self._ssh_server = ssh_server
         self._ssh_password = ssh_password
+        
+        # Info
         self._identity = identity
 
         self.setup()
@@ -33,7 +42,7 @@ class RemoteBase(object):
         # ZeroMQ Context
         context = zmq.Context.instance()
         # Define the socket using the "Context"
-        socket = context.socket(zmq.REQ)
+        socket = context.socket(self._socket_type)
 
         self.connect(socket)
         self._context = context
@@ -42,19 +51,20 @@ class RemoteBase(object):
     def verify_connection(self):
         # First Send a Hello message to ensure the
         # connection is established
-        self.send(contents=utils.HELLO_MESSAGE)
+        self.send(header="HELLO")
         envelop = self.receive()
 
-        if not isinstance(envelop, Envelop):
+        if not isinstance(envelop, (envelops.ClientEnvelop,
+                                    envelops.ServerEnvelop)):
             raise TypeError("received envelop must be `Envelop`")
         
-        if envelop.contents == utils.HELLO_MESSAGE:
+        if envelop.header == "HELLO":
             logging.info("Connected to {}".format(self._address))
         else:
-            raise ValueError("Received {}".format(envelop.contents))
+            raise ValueError("Received {}".format(envelop.header))
 
 
-    def send(self, messages, *args, **kwargs):
+    def send(self, *args, **kwargs):
         raise NotImplementedError
 
     def receive(self, *args, **kwargs):
@@ -84,88 +94,81 @@ class BasicServer(RemoteBase):
                  identity="server"):
         super(BasicServer, self).__init__(
             address=address,
+            socket_type=zmq.REQ,
             ssh_server=ssh_server,
             ssh_password=ssh_password,
             identity=identity)
 
         self.start()
 
-    def send(self, contents, receiver_address=None):
-        utils.assert_safe_no_receiver(
+    def send(self, header, contents=None):
+        envelop = envelops.make_server_envelop(
+            header=header,
             contents=contents,
-            receiver_address=receiver_address)
-
-        self._socket.send_multipart([
-            receiver_address or utils.EMPTY,
-            utils.serialize_pyobj(self.identity),
-            utils.serialize_pyobj(contents)])
+            identity=self.identity,
+            serialize=True)
+ 
+        self._socket.send(envelop)
 
     def receive(self):
-        messages = self._socket.recv_multipart()
-
-        # [address][empty][identity][request]
-        if len(messages) != 4:
-            raise ValueError("`len(messages)` should be 4")
-
-        sender_address, empty, _, contents = messages
-        utils.assert_empty(empty)
-        contents = utils.deserialize_pyobj(contents)
-
-        return Envelop(contents=contents,
-                       sender_address=sender_address)
+        return envelops.deserialize_server_envelop(
+            serialied_envelop=self._socket.recv())
 
     def start(self):
         # Tell the Router the server is ready
-        self.send(contents=utils.READY_MESSAGE)
+        self.send(header="READY")
 
         try:
             while True:
                 envelop = self.receive()
                 logging.info("{}: {}".format(self.identity, envelop.contents))
                 contents_to_return = self.execute(envelop.contents)
-                self.send(contents=contents_to_return,
-                          receiver_address=envelop.sender_address)
+                self.send(header="POST", contents=contents_to_return)
 
         except zmq.ContextTerminated:
             # context terminated so quit silently
             return
 
     def execute(self, contents):
+        time.sleep(30)
         return "OK"
 
 
 class BasicClient(RemoteBase):
+    """Tuner Client
+
+    Client sends requests (i.e. instances of models) to the proxy, who
+    then forwards requests to servers.
+
+    Message Structure:
+        Header: String
+            The type of request, POST or GET
+        Identity: String
+            Identity of the client
+        Contents: Object
+            The contents to be sent.
+    """
     def __init__(self,
                  address,
                  ssh_server=None,
                  ssh_password=None,
-                 identity="server"):
+                 identity="client"):
         super(BasicClient, self).__init__(
             address=address,
+            socket_type=zmq.REQ,
             ssh_server=ssh_server,
             ssh_password=ssh_password,
             identity=identity)
 
-        self.request()
-
-    def send(self, contents):
-        self._socket.send_multipart([
-            utils.serialize_pyobj(self.identity),
-            utils.serialize_pyobj(contents)])
+    def send(self, header, contents=None):
+        envelop = envelops.make_client_envelop(
+            header=header,
+            contents=contents,
+            identity=self.identity,
+            serialize=True)
+ 
+        self._socket.send(envelop)
 
     def receive(self):
-        messages = self._socket.recv_multipart()
-        # Response is [identity][response]
-        if len(messages) != 2:
-            raise ValueError("`len(messages)` should be 2")
-
-        _, contents = messages
-        contents = utils.deserialize_pyobj(contents)
-        return Envelop(contents=contents,
-                       sender_address=None)
-
-    def request(self):
-        # Tell the Router the server is ready
-        self.send(contents=b"DUMMY")
-        envelop = self.receive()
-        logging.info("{}: {}".format(self.identity, envelop.contents))
+        return envelops.deserialize_client_envelop(
+            serialied_envelop=self._socket.recv())
