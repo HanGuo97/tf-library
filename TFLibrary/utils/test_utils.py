@@ -10,6 +10,16 @@ from tensorflow.python.framework.dtypes import DType as tf_dtype
 #     print("DEBUG:\t", *args, **kargs)
 
 
+def toTensor(**additional_kwargs):
+    def _wrapper_func(func):
+        def _wrapped_func(*args, **kwargs):
+            return tf.convert_to_tensor(
+                func(*args, **kwargs),
+                **additional_kwargs)
+        return _wrapped_func
+    return _wrapper_func
+
+
 def torch_to_tensor(func):
     def decorated(*args):
         _args = []

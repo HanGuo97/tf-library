@@ -133,7 +133,7 @@ class ZMQClient(remote_base.RemoteClient):
 
 
 class ZMQSSHTunnelClient(ZMQClient):
-    """ZeroMQ-based Client but connect via SSH Tunnel
+    """ZeroMQ-based Client but connects via SSH Tunnel
 
         Details: https://pyzmq.readthedocs.io/en/latest/ssh.html
         Codes: https://github.com/zeromq/pyzmq/blob/master/zmq/ssh/tunnel.py
