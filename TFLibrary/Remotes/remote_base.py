@@ -1,5 +1,6 @@
 class RemoteServer(object):
     """Metrics Server"""
+
     def __init__(self, func, address, identity="server"):
         if not callable(func):
             raise TypeError("`func` must be Callable, "
@@ -38,6 +39,7 @@ class RemoteServer(object):
 
 class RemoteClient(object):
     """Metrics Client"""
+
     def __init__(self, address, identity="client"):
         self._address = address
         self._identity = identity
