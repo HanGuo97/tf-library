@@ -13,6 +13,7 @@ logging.set_verbosity(logging.DEBUG)
 
 class ZMQServer(remote_base.RemoteServer):
     """Server Metrics Implemented Using ZeroMQ"""
+    
     def setup(self):
         # ZeroMQ Context
         context = zmq.Context()
@@ -143,10 +144,18 @@ class ZMQSSHTunnelClient(ZMQClient):
                  address,
                  server,
                  password=None,
-                 identity="SshTunnelClient"):
+                 identity="SshTunnelClient",
+                 **ssh_tunnel_kwargs):
 
         self._server = server
         self._password = password
+        self._ssh_tunnel_kwargs = ssh_tunnel_kwargs
+
+        if ssh_tunnel_kwargs:
+            print("Extra Tunnel Args:")
+            for key, val in ssh_tunnel_kwargs.items():
+                print("{} {}".format(key, val))
+
         super(ZMQSSHTunnelClient, self).__init__(
             address=address, identity=identity)
 
@@ -162,7 +171,8 @@ class ZMQSSHTunnelClient(ZMQClient):
         ssh.tunnel_connection(
             socket, self._address,
             server=self._server,
-            password=self._password)
+            password=self._password,
+            **self._ssh_tunnel_kwargs)
 
         logging.info("Connecting to %s" % self._address)
 
