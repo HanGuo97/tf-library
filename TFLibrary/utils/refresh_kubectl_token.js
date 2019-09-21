@@ -1,9 +1,14 @@
 // Install Node.js without sudo: https://gist.github.com/isaacs/579814
+// Then install `puppeteer`: npm i puppeteer
+// Then install `inquirer`: npm install inquirer
 const puppeteer = require('puppeteer');
 const inquirer = require('inquirer');
 
 (async () => {
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
   const page = await browser.newPage();
   await page.goto('https://kubem.its.unc.edu:32002');
   await page.click("input[value='Request Token']");
