@@ -6,10 +6,10 @@ FROM tensorflow/tensorflow:2.0.0rc0-gpu-py3
 
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 RUN apt-get update && apt-get install -y \
-	build-essential \
-	git \
-	vim \
-	screen \
+    build-essential \
+    git \
+    vim \
+    screen \
     parallel \
  && rm -rf /var/lib/apt/lists/*
 
@@ -20,7 +20,7 @@ COPY ./REQUIREMENTS.txt .
 COPY ./README.md .
 COPY ./setup.py .
 RUN pip install -e . && \
-	pip install -r REQUIREMENTS.txt
+    pip install -r REQUIREMENTS.txt
 
 # Finally, upload our actual code
 COPY . /research/TF-RLLibs
