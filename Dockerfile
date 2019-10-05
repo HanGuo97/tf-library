@@ -4,6 +4,10 @@
 # This seems to work on a wider range of servers
 FROM tensorflow/tensorflow:latest-gpu-py3
 
+# Avoid the interactive prompt when installing `tzdata`
+# https://techoverflow.net/2019/05/18/how-to-fix-configuring-tzdata-interactive-input-when-building-docker-images/
+ENV DEBIAN_FRONTEND=noninteractive
+
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 RUN apt-get update && apt-get install -y \
     build-essential \
