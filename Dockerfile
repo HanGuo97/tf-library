@@ -2,7 +2,7 @@
 # FROM nvcr.io/nvidia/tensorflow:18.07-py3
 
 # This seems to work on a wider range of servers
-FROM tensorflow/tensorflow:2.0.0rc0-gpu-py3
+FROM tensorflow/tensorflow:latest-gpu-py3
 
 # https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#run
 RUN apt-get update && apt-get install -y \

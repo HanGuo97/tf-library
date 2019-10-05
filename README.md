@@ -35,7 +35,9 @@ pip install -r REQUIREMENTS.txt
 # Docker
 ```sh
 # using `--no-cache` to avoid accidentally missing changes in parent tensorflow image
-docker build -t tf-library:`git rev-parse --abbrev-ref HEAD` .
+Tags="tf2.0.0-torch1.2.0"
+GitBranch=`git rev-parse --abbrev-ref HEAD`
+docker build -t tf-library:${GitBranch}-${Tags} .
 ```
 
 # Versions

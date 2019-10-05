@@ -15,3 +15,5 @@ oyaml
 absl-py
 scikit-optimize
 tensorflow-hub
+torch
+torchvision
