@@ -2,7 +2,7 @@
 # FROM nvcr.io/nvidia/tensorflow:18.07-py3
 
 # This seems to work on a wider range of servers
-FROM tensorflow/tensorflow:latest-gpu-py3
+FROM tensorflow/tensorflow:latest-devel-gpu-py3
 
 # Avoid the interactive prompt when installing `tzdata`
 # https://techoverflow.net/2019/05/18/how-to-fix-configuring-tzdata-interactive-input-when-building-docker-images/
